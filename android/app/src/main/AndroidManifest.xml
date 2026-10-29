@@ -1,6 +1,6 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:allowBackup="true"
+        android:allowBackup="true"\n        android:networkSecurityConfig="@xml/astra_network_security_config"
         android:label="Astra Assistant"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
