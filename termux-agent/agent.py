@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import subprocess
+import sqlite3
 import sys
 import time
 import urllib.error
@@ -17,7 +18,8 @@ from typing import Any
 BASE_DIR = Path(__file__).resolve().parent
 WORKSPACE = Path(os.environ.get("AGENT_WORKSPACE", str(BASE_DIR / "workspace"))).resolve()
 MAX_READ_BYTES = 20_000
-ALLOWED_TOOLS = {"device_status", "list_files", "read_file", "write_file", "safe_command", "open_url"}
+MEMORY_DB = Path(os.environ.get("AGENT_MEMORY_DB", str(BASE_DIR / "memory.sqlite3"))).resolve()
+ALLOWED_TOOLS = {"device_status", "list_files", "read_file", "write_file", "safe_command", "open_url", "memory_add", "memory_search", "clipboard_get", "clipboard_set", "launch_app"}
 
 
 def _request_json(url: str, payload: dict[str, Any] | None = None, headers: dict[str, str] | None = None, timeout: int = 30) -> Any:
@@ -131,6 +133,73 @@ def tool_open_url(args: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "opened": url}
 
 
+
+def _memory_connection() -> sqlite3.Connection:
+    MEMORY_DB.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(MEMORY_DB, timeout=5)
+    connection.execute("CREATE TABLE IF NOT EXISTS memories (id INTEGER PRIMARY KEY, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, content TEXT NOT NULL)")
+    return connection
+
+
+def tool_memory_add(args: dict[str, Any]) -> dict[str, Any]:
+    content = args.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("Укажи непустой текст в content.")
+    if len(content) > 2000:
+        raise ValueError("Одна запись памяти не может превышать 2000 символов.")
+    with _memory_connection() as db:
+        cursor = db.execute("INSERT INTO memories(content) VALUES (?)", (content.strip(),))
+        memory_id = cursor.lastrowid
+    return {"ok": True, "id": memory_id, "saved": content.strip()}
+
+
+def tool_memory_search(args: dict[str, Any]) -> dict[str, Any]:
+    query = str(args.get("query", "")).strip()
+    with _memory_connection() as db:
+        if query:
+            rows = db.execute("SELECT id, created_at, content FROM memories WHERE content LIKE ? ORDER BY id DESC LIMIT 20", ("%" + query[:200] + "%",)).fetchall()
+        else:
+            rows = db.execute("SELECT id, created_at, content FROM memories ORDER BY id DESC LIMIT 20").fetchall()
+    return {"count": len(rows), "memories": [{"id": row[0], "created_at": row[1], "content": row[2]} for row in rows]}
+
+
+def tool_clipboard_get(_: dict[str, Any]) -> dict[str, Any]:
+    try:
+        result = subprocess.run(["termux-clipboard-get"], capture_output=True, text=True, timeout=5, check=False)
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("Буфер обмена недоступен. Установи Termux:API и пакет termux-api.") from exc
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip() or "Не удалось прочитать буфер обмена.")
+    return {"text": result.stdout[:5000]}
+
+
+def tool_clipboard_set(args: dict[str, Any]) -> dict[str, Any]:
+    content = args.get("text")
+    if not isinstance(content, str) or len(content) > 5000:
+        raise ValueError("Укажи text длиной до 5000 символов.")
+    try:
+        result = subprocess.run(["termux-clipboard-set"], input=content, capture_output=True, text=True, timeout=5, check=False)
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("Буфер обмена недоступен. Установи Termux:API и пакет termux-api.") from exc
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip() or "Не удалось записать буфер обмена.")
+    return {"ok": True, "characters": len(content)}
+
+
+def tool_launch_app(args: dict[str, Any]) -> dict[str, Any]:
+    package = str(args.get("package", "")).strip()
+    allowed = {"org.telegram.messenger", "com.android.settings", "com.android.chrome", "com.google.android.youtube"}
+    if package not in allowed:
+        raise ValueError("Пакет не в разрешённом списке. Доступно: " + ", ".join(sorted(allowed)))
+    try:
+        result = subprocess.run(["am", "start", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER", "-p", package], capture_output=True, text=True, timeout=10, check=False)
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("Команда Android am недоступна в этой среде.") from exc
+    if result.returncode:
+        raise RuntimeError((result.stderr or result.stdout or "Android не запустил приложение.")[-1000:])
+    return {"ok": True, "package": package, "result": (result.stdout or result.stderr).strip()[-1000:]}
+
+
 TOOLS = {
     "device_status": tool_device_status,
     "list_files": tool_list_files,
@@ -138,6 +207,11 @@ TOOLS = {
     "write_file": tool_write_file,
     "safe_command": tool_safe_command,
     "open_url": tool_open_url,
+    "memory_add": tool_memory_add,
+    "memory_search": tool_memory_search,
+    "clipboard_get": tool_clipboard_get,
+    "clipboard_set": tool_clipboard_set,
+    "launch_app": tool_launch_app,
 }
 
 
@@ -169,11 +243,11 @@ def ask_model(text: str) -> str:
         "Ты не можешь выполнять произвольные shell-команды и не должен просить секреты. "
         "Если требуется один из инструментов, верни только JSON вида "
         '{"tool":"list_files","arguments":{"path":"."}}. '
-        "Доступные инструменты: device_status, list_files, read_file, write_file, safe_command, open_url. "
+        "Доступные инструменты: device_status, list_files, read_file, write_file, safe_command, open_url, memory_add, memory_search, clipboard_get, clipboard_set, launch_app. "
         "safe_command принимает только pwd, date, python --version, git status, disk, list workspace. "
         "write_file создаёт только новый файл в workspace и не перезаписывает существующие. "
         "Не используй инструменты для отправки сообщений; этой возможности у модели нет. "
-        "Если инструмент не нужен, отвечай обычным текстом."
+        "launch_app разрешён только для org.telegram.messenger, com.android.settings, com.android.chrome, com.google.android.youtube. memory_add сохраняет явно переданный текст в локальную SQLite-память. Не читай буфер обмена без явной просьбы пользователя. Если инструмент не нужен, отвечай обычным текстом."
     )
     payload = {"model": model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": text}], "temperature": 0.2}
     result = _request_json(url, payload, {"Content-Type": "application/json", **headers}, timeout=60)
