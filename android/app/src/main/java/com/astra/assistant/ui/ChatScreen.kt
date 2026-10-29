@@ -45,6 +45,12 @@ fun ChatScreen(
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     var draft by rememberSaveable { mutableStateOf("") }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showBridge by rememberSaveable { mutableStateOf(false) }
+
+    if (showBridge) {
+        BridgeScreen(onBack = { showBridge = false })
+        return
+    }
 
     if (showSettings) {
         SettingsScreen(
@@ -73,6 +79,9 @@ fun ChatScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            TextButton(onClick = { showBridge = true }) {
+                Text("🔗 Termux")
             }
             TextButton(onClick = { showSettings = true }) {
                 Text("⚙ Настройки")
