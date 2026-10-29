@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Astra Assistant</string>
+    <string name="astra_accessibility_service_description">Astra tracks only which app is currently in the foreground. It does not read screen text or perform actions in this preview.</string>
+</resources>
