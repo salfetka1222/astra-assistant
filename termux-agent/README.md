@@ -97,6 +97,21 @@ Open your bot and send `/start`. Available commands: `/help`, `/status`, `/files
 
 Never use a bot token from a public repo or allow unknown chat IDs. In this MVP the bot does not send messages to third parties.
 
+## Additional local tools
+
+- memory_add and memory_search: private local SQLite memory (file memory.sqlite3).
+- clipboard_get and clipboard_set: use Termux:API; clipboard reading should only be invoked when you explicitly want it.
+- launch_app: attempts to open only a small hard-coded package allowlist. Android may reject the command on some devices.
+
+Examples:
+
+    python agent.py --tool memory_add --args '{"content":"Astra local memory test"}'
+    python agent.py --tool memory_search --args '{"query":"Astra local memory test"}'
+    python agent.py --tool launch_app --args '{"package":"com.android.settings"}'
+    python agent.py --tool clipboard_set --args '{"text":"Text copied by Astra"}'
+
+The Android accessibility bridge is not implemented yet. See ANDROID_BRIDGE.md for the security plan and next stage.
+
 ## Tests
 
 ```sh
