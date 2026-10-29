@@ -8,7 +8,7 @@ on:
       - ".github/workflows/android-build.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -32,10 +32,24 @@ jobs:
       - name: Build debug APK
         run: gradle -p android :app:assembleDebug
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: astra-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish direct APK download
+        if: github.ref == 'refs/heads/feature/termux-agent-mvp'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-debug
+          name: Astra Debug APK
+          prerelease: true
+          draft: false
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          overwrite_files: true
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
