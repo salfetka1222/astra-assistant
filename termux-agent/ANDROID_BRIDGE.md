@@ -5,7 +5,7 @@ The Termux agent now has bounded local tools, but it does not yet control arbitr
 ## Security requirements for the bridge
 
 1. The user enables the service manually in Android Accessibility settings. The app must explain exactly what access means.
-2. Never expose an unauthenticated network listener on 0.0.0.0. If a local bridge is added, bind only to 127.0.0.1, use a random per-install token, validate every request, and reject unknown actions.
+2. Never expose a listener on 0.0.0.0. The first-stage bridge binds only to 127.0.0.1, uses a random bearer token, validates every request, limits body size, and rejects unknown actions.
 3. Use a strict action allowlist: inspect current app, open an allowlisted app, tap a visible element by text only after the user requested it, scroll, and type text only into the focused field.
 4. Require a visible confirmation for external side effects: sending messages, posting, purchasing, deleting, changing security settings, or sharing private data.
 5. Do not continuously capture screen text or screenshots. Read only the minimum UI information needed for the active task, and keep sensitive content out of logs.
