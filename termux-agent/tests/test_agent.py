@@ -40,6 +40,19 @@ class AgentSafetyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             agent.tool_open_url({"url": "file:///etc/passwd"})
 
+    def test_local_memory_round_trip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(agent, "MEMORY_DB", Path(tmp) / "memory.sqlite3"):
+                saved = agent.tool_memory_add({"content": "Предпочитаю русский язык"})
+                found = agent.tool_memory_search({"query": "русский"})
+                self.assertTrue(saved["ok"])
+                self.assertEqual(found["count"], 1)
+                self.assertIn("русский", found["memories"][0]["content"])
+
+    def test_app_launch_allowlist_rejects_unknown_package(self):
+        with self.assertRaises(ValueError):
+            agent.tool_launch_app({"package": "com.example.not-installed"})
+
 
 if __name__ == "__main__":
     unittest.main()
