@@ -110,7 +110,27 @@ Examples:
     python agent.py --tool launch_app --args '{"package":"com.android.settings"}'
     python agent.py --tool clipboard_set --args '{"text":"Text copied by Astra"}'
 
-The Android accessibility bridge is not implemented yet. See ANDROID_BRIDGE.md for the security plan and next stage.
+## Android ↔ Termux bridge (first stage)
+
+The bridge exposes only read-only tools to the Astra Android app. It listens on `127.0.0.1:8765` only, requires a random bearer token, limits request bodies, and rejects write/launch/clipboard tools. It is not exposed to Wi-Fi or the public internet.
+
+Start it in Termux from this folder:
+
+```sh
+python bridge.py
+```
+
+Copy the one-time token printed in Termux into Astra → **Termux** → **Проверить соединение**. Keep the token private. The app stores it in its private preferences. Stop the bridge with Ctrl+C in Termux. The first-stage buttons can request the health status, device status, and workspace listing. The bridge must be running while using these features.
+
+Only these tools are currently exposed: `device_status`, `list_files`, `read_file`, `memory_search`, and `safe_command`. The existing fixed command allowlist and workspace path checks still apply. Do not bind this server to `0.0.0.0`, do not forward its port, and do not use a short or public token.
+
+Tests:
+
+```sh
+python -m unittest discover -s tests -v
+```
+
+See ANDROID_BRIDGE.md for security boundaries and the next development stage.
 
 ## Tests
 
