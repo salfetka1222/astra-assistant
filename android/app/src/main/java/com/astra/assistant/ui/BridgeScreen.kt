@@ -42,6 +42,8 @@ fun BridgeScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(BRIDGE_PREFS, Context.MODE_PRIVATE) }
     var token by remember { mutableStateOf(prefs.getString(BRIDGE_TOKEN_KEY, "") ?: "") }
+    var filePath by remember { mutableStateOf("") }
+    var memoryQuery by remember { mutableStateOf("") }
     var result by remember { mutableStateOf("Мост пока не проверен.") }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -129,6 +131,52 @@ fun BridgeScreen(onBack: () -> Unit) {
             },
             enabled = !busy
         ) { Text("Показать workspace") }
+
+        Text("Чтение файла workspace", style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(
+            value = filePath,
+            onValueChange = { filePath = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Относительный путь") },
+            placeholder = { Text("например, notes.txt") },
+            singleLine = true
+        )
+        Button(
+            onClick = {
+                val requestedPath = filePath.trim()
+                if (requestedPath.isEmpty()) {
+                    result = "Укажи путь к файлу внутри workspace."
+                } else {
+                    runRequest(
+                        "/v1/tool",
+                        JSONObject().put("tool", "read_file")
+                            .put("arguments", JSONObject().put("path", requestedPath))
+                    )
+                }
+            },
+            enabled = !busy
+        ) { Text("Прочитать файл") }
+
+        Text("Поиск локальной памяти", style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(
+            value = memoryQuery,
+            onValueChange = { memoryQuery = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Поисковая фраза") },
+            placeholder = { Text("Оставь пустым, чтобы показать последние записи") },
+            singleLine = true
+        )
+        Button(
+            onClick = {
+                runRequest(
+                    "/v1/tool",
+                    JSONObject().put("tool", "memory_search")
+                        .put("arguments", JSONObject().put("query", memoryQuery.trim()))
+                )
+            },
+            enabled = !busy
+        ) { Text("Найти в памяти") }
+
         Spacer(Modifier.height(4.dp))
         Text("Ответ моста", style = MaterialTheme.typography.titleMedium)
         Text(result, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
