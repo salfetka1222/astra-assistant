@@ -14,11 +14,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from agent import run_tool
+from security import Invocation, RequestSource, create_request_context
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 MAX_BODY_BYTES = 8192
-READ_ONLY_TOOLS = frozenset({"device_status", "list_files", "read_file", "memory_search", "safe_command"})
+READ_ONLY_TOOLS = frozenset({"list_files"})
 
 
 class AstraBridgeServer(ThreadingHTTPServer):
@@ -109,9 +110,10 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"ok": False, "error": "arguments_must_be_object"})
             return
         try:
-            result = run_tool(name, arguments)
-        except (ValueError, RuntimeError) as exc:
-            self._send_json(400, {"ok": False, "error": str(exc)[:500]})
+            context = create_request_context(source=RequestSource.BRIDGE, invocation=Invocation.DIRECT, principal="authenticated_local_bridge", session_id="bridge_http_request")
+            result = run_tool(name, arguments, context=context)
+        except (ValueError, RuntimeError):
+            self._send_json(403, {"ok": False, "error": "tool_rejected"})
             return
         self._send_json(200, {"ok": True, "tool": name, "result": result})
 
