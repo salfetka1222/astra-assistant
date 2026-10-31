@@ -15,6 +15,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from security import Invocation, RequestContext, RequestSource, authorize_tool, create_request_context
+
 BASE_DIR = Path(__file__).resolve().parent
 WORKSPACE = Path(os.environ.get("AGENT_WORKSPACE", str(BASE_DIR / "workspace"))).resolve()
 MAX_READ_BYTES = 20_000
@@ -215,7 +217,10 @@ TOOLS = {
 }
 
 
-def run_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+def run_tool(name: str, arguments: dict[str, Any] | None = None, *, context: RequestContext | None = None) -> dict[str, Any]:
+    decision = authorize_tool(name, context)
+    if not decision.allowed:
+        raise ValueError(f"Инструмент запрещён политикой доступа: {decision.reason}")
     if name not in ALLOWED_TOOLS or name not in TOOLS:
         raise ValueError("Такой инструмент не разрешён.")
     if arguments is not None and not isinstance(arguments, dict):
@@ -223,7 +228,7 @@ def run_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, An
     return TOOLS[name](arguments or {})
 
 
-def ask_model(text: str) -> str:
+def ask_model(text: str, *, context: RequestContext) -> str:
     """Ask configured cloud or local OpenAI-compatible endpoint for a reply/tool JSON."""
     api_key = os.environ.get("CLOUD_API_KEY", "").strip()
     cloud_url = os.environ.get("CLOUD_BASE_URL", "").rstrip("/")
@@ -263,7 +268,8 @@ def ask_model(text: str) -> str:
             decision = json.loads(stripped)
             tool = decision.get("tool")
             if tool in ALLOWED_TOOLS:
-                output = run_tool(tool, decision.get("arguments", {}))
+                model_context = create_request_context(source=context.source, invocation=Invocation.MODEL, principal=context.principal, session_id=context.session_id)
+                output = run_tool(tool, decision.get("arguments", {}), context=model_context)
                 return json.dumps(output, ensure_ascii=False, indent=2)
         except (json.JSONDecodeError, ValueError, RuntimeError) as exc:
             return f"Не удалось безопасно выполнить инструмент: {exc}"
@@ -306,18 +312,24 @@ def telegram_loop() -> None:
                 chat = message.get("chat", {})
                 chat_id = chat.get("id")
                 text = str(message.get("text", "")).strip()
-                if not isinstance(chat_id, int) or chat_id not in allowed or not text:
+                sender = message.get("from", {})
+                sender_id = sender.get("id") if isinstance(sender, dict) else None
+                # Private chats only: the authenticated sender must own the allowed chat.
+                if (not isinstance(chat_id, int) or chat_id not in allowed
+                        or chat.get("type") != "private" or sender_id != chat_id
+                        or not text):
                     continue
+                context = create_request_context(source=RequestSource.TELEGRAM, invocation=Invocation.DIRECT, principal=str(sender_id), session_id=f"telegram:{chat_id}")
                 if text == "/start":
                     answer = "Привет! Я Astra Termux Agent. Команды: /help, /status, /files, /ask текст. Отправка сообщений другим людям выключена в MVP."
                 elif text == "/help":
                     answer = "Команды:\n/status — состояние устройства\n/files — файлы workspace\n/ask текст — вопрос ИИ\n/help — помощь"
                 elif text == "/status":
-                    answer = json.dumps(run_tool("device_status"), ensure_ascii=False, indent=2)
+                    answer = "Команда /status недоступна через Telegram по политике безопасности."
                 elif text == "/files":
-                    answer = json.dumps(run_tool("list_files"), ensure_ascii=False, indent=2)
+                    answer = json.dumps(run_tool("list_files", context=context), ensure_ascii=False, indent=2)
                 elif text.startswith("/ask "):
-                    answer = ask_model(text[5:].strip())
+                    answer = ask_model(text[5:].strip(), context=context)
                 else:
                     answer = "Неизвестная команда. Напиши /help."
                 telegram_api(token, "sendMessage", {"chat_id": chat_id, "text": answer[:4000]})
@@ -338,6 +350,8 @@ def main() -> int:
     parser.add_argument("--args", default="{}", help="Аргументы инструмента в JSON")
     args = parser.parse_args()
     ensure_workspace()
+    local_source = RequestSource.VOICE if args.voice else RequestSource.CLI
+    local_context = create_request_context(source=local_source, invocation=Invocation.DIRECT, principal=f"uid:{os.getuid()}", session_id=f"pid:{os.getpid()}")
     try:
         if args.telegram:
             telegram_loop()
@@ -348,12 +362,12 @@ def main() -> int:
                 return 1
             spoken = result.stdout.strip()
             print("Распознано:", spoken)
-            print(ask_model(spoken))
+            print(ask_model(spoken, context=local_context))
         elif args.ask is not None:
-            print(ask_model(args.ask))
+            print(ask_model(args.ask, context=local_context))
         elif args.tool:
             parsed = json.loads(args.args)
-            print(json.dumps(run_tool(args.tool, parsed), ensure_ascii=False, indent=2))
+            print(json.dumps(run_tool(args.tool, parsed, context=local_context), ensure_ascii=False, indent=2))
         else:
             parser.print_help()
     except (ValueError, RuntimeError, json.JSONDecodeError, subprocess.TimeoutExpired) as exc:
