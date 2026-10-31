@@ -45,6 +45,12 @@ class BridgeSafetyTests(unittest.TestCase):
         status, payload = self.request("GET", "/v1/health", token=self.token)
         self.assertEqual(status, 200)
         self.assertEqual(payload["service"], "Astra Termux Bridge")
+        self.assertEqual(payload["status"], "online")
+        self.assertEqual(payload["transport"], "loopback")
+        self.assertIsInstance(payload["uptime_seconds"], int)
+        self.assertGreaterEqual(payload["uptime_seconds"], 0)
+        self.assertEqual(payload["tools"], ["list_files"])
+        self.assertNotIn("token", payload)
 
     def test_write_tool_is_blocked_before_execution(self):
         with patch.object(bridge, "run_tool") as run_tool:

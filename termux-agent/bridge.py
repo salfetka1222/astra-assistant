@@ -10,6 +10,7 @@ import hmac
 import json
 import os
 import secrets
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -32,6 +33,7 @@ class AstraBridgeServer(ThreadingHTTPServer):
         if len(token) < 32:
             raise ValueError("Bridge token must be at least 32 characters.")
         self.token = token
+        self.started_at = time.monotonic()
         super().__init__(server_address, AstraBridgeHandler)
 
 
@@ -72,6 +74,9 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
             "ok": True,
             "service": "Astra Termux Bridge",
             "version": 1,
+            "status": "online",
+            "transport": "loopback",
+            "uptime_seconds": max(0, int(time.monotonic() - self.server.started_at)),
             "tools": sorted(READ_ONLY_TOOLS),
         })
 

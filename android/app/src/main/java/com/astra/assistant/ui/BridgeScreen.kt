@@ -76,7 +76,18 @@ fun BridgeScreen(onBack: () -> Unit) {
                         val status = connection.responseCode
                         val stream = if (status in 200..299) connection.inputStream else connection.errorStream
                         val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-                        "HTTP $status\n$text"
+                        if (status == 200 && path == "/v1/health") {
+                            val health = JSONObject(text)
+                            val uptime = health.optLong("uptime_seconds", 0)
+                            val tools = health.optJSONArray("tools")
+                            val available = (0 until (tools?.length() ?: 0)).joinToString(", ") { tools?.optString(it).orEmpty() }
+                            "Astra Bridge: ${health.optString("status", "неизвестно")}\n" +
+                                "Соединение: ${health.optString("transport", "неизвестно")}\n" +
+                                "Время работы: ${uptime} сек.\n" +
+                                "Разрешённые инструменты: $available"
+                        } else {
+                            "HTTP $status\n$text"
+                        }
                     } finally {
                         connection.disconnect()
                     }
@@ -110,9 +121,6 @@ fun BridgeScreen(onBack: () -> Unit) {
             placeholder = { Text("Вставь токен после запуска bridge.py") },
             singleLine = true
         )
-        Button(onClick = { runRequest("/v1/health") }, enabled = !busy) {
-            Text(if (busy) "Проверяем…" else "Проверить соединение")
-        }
         Button(
             onClick = { runRequest("/v1/health") },
             enabled = !busy
