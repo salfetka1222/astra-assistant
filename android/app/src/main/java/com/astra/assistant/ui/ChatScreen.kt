@@ -46,6 +46,12 @@ fun ChatScreen(
     var draft by rememberSaveable { mutableStateOf("") }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showBridge by rememberSaveable { mutableStateOf(false) }
+    var showUpdates by rememberSaveable { mutableStateOf(false) }
+
+    if (showUpdates) {
+        UpdatesScreen(onBack = { showUpdates = false })
+        return
+    }
 
     if (showBridge) {
         BridgeScreen(onBack = { showBridge = false })
@@ -56,7 +62,8 @@ fun ChatScreen(
         SettingsScreen(
             themeMode = themeMode,
             onThemeModeChange = onThemeModeChange,
-            onBack = { showSettings = false }
+            onBack = { showSettings = false },
+            onUpdates = { showSettings = false; showUpdates = true }
         )
         return
     }
@@ -144,7 +151,8 @@ fun ChatScreen(
 private fun SettingsScreen(
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onUpdates: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -204,6 +212,9 @@ private fun SettingsScreen(
                 }
             }
         }
+
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = onUpdates) { Text("Проверить обновления Astra") }
 
         Spacer(Modifier.height(24.dp))
         Text("О приложении", style = MaterialTheme.typography.titleLarge)
