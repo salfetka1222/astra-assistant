@@ -71,7 +71,7 @@ jobs:
           ASTRA_SIGNING_STORE_PASSWORD: ${{ secrets.ASTRA_KEYSTORE_PASSWORD }}
           ASTRA_SIGNING_KEY_ALIAS: ${{ secrets.ASTRA_KEY_ALIAS }}
           ASTRA_SIGNING_KEY_PASSWORD: ${{ secrets.ASTRA_KEY_PASSWORD }}
-        run: gradle -p android :app:assembleRelease
+        run: gradle -p android :app:assembleRelease --stacktrace
 
       - name: Generate release checksum
         if: github.event_name == 'workflow_dispatch' && (inputs.build_signed || inputs.publish_release)
