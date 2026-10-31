@@ -80,8 +80,12 @@ private fun checkLatestRelease(installedCode: Long): String {
             setRequestProperty("Accept", "application/vnd.github+json")
             setRequestProperty("User-Agent", "Astra-Assistant-Updater")
         }
-        if (connection.responseCode != 200) {
-            return "Не удалось получить сведения о релизе (HTTP ${connection.responseCode})."
+        val responseCode = connection.responseCode
+        if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
+            return "Стабильный релиз Astra пока недоступен. Попробуй проверить обновления позже."
+        }
+        if (responseCode != HttpURLConnection.HTTP_OK) {
+            return "Не удалось получить сведения о релизе (HTTP $responseCode)."
         }
         val data = connection.inputStream.bufferedReader().use { JSONObject(it.readText()) }
         val tag = data.optString("tag_name")
