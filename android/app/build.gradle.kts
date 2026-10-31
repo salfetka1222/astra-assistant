@@ -1,3 +1,5 @@
+import java.io.File
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -13,8 +15,33 @@ android {
         applicationId = "com.astra.assistant"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+    }
+
+    val signingPath = System.getenv("ASTRA_SIGNING_KEYSTORE_PATH")
+    val signingPassword = System.getenv("ASTRA_SIGNING_STORE_PASSWORD")
+    val signingAlias = System.getenv("ASTRA_SIGNING_KEY_ALIAS")
+    val signingKeyPassword = System.getenv("ASTRA_SIGNING_KEY_PASSWORD")
+    val releaseSigningConfigured = listOf(signingPath, signingPassword, signingAlias, signingKeyPassword)
+        .all { !it.isNullOrBlank() }
+
+    signingConfigs {
+        create("astraRelease") {
+            if (releaseSigningConfigured) {
+                storeFile = File(signingPath!!)
+                storePassword = signingPassword
+                keyAlias = signingAlias
+                keyPassword = signingKeyPassword
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("astraRelease")
+            }
+        }
     }
 
     buildFeatures {

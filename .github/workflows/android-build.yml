@@ -2,6 +2,12 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Publish signed release (requires signing secrets and approval)"
+        type: boolean
+        required: true
+        default: false
   push:
     paths:
       - "android/**"
@@ -40,16 +46,46 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish direct APK download
-        if: github.ref == 'refs/heads/feature/termux-agent-mvp'
+      # Release builds are manual and must never fall back to a debug signature.
+      - name: Verify release signing configuration
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release
+        env:
+          KEYSTORE: ${{ secrets.ASTRA_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ASTRA_SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ASTRA_SIGNING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ASTRA_SIGNING_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE" && test -n "$STORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD" || { echo "Missing signing secrets"; exit 1; }
+          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/astra-release.jks"
+          chmod 600 "$RUNNER_TEMP/astra-release.jks"
+
+      - name: Build signed release APK
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release
+        env:
+          ASTRA_SIGNING_KEYSTORE_PATH: ${{ runner.temp }}/astra-release.jks
+          ASTRA_SIGNING_STORE_PASSWORD: ${{ secrets.ASTRA_SIGNING_STORE_PASSWORD }}
+          ASTRA_SIGNING_KEY_ALIAS: ${{ secrets.ASTRA_SIGNING_KEY_ALIAS }}
+          ASTRA_SIGNING_KEY_PASSWORD: ${{ secrets.ASTRA_SIGNING_KEY_PASSWORD }}
+        run: gradle -p android :app:assembleRelease
+
+      - name: Generate release checksum
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release
+        run: |
+          cd android/app/build/outputs/apk/release
+          test -f app-release.apk
+          sha256sum app-release.apk > app-release.apk.sha256
+
+      - name: Publish signed APK and checksum
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-debug
-          name: Astra Debug APK
-          prerelease: true
+          tag_name: astra-v2
+          name: Astra 0.2.0
+          prerelease: false
           draft: false
-          files: android/app/build/outputs/apk/debug/app-debug.apk
-          overwrite_files: true
+          files: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/apk/release/app-release.apk.sha256
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
