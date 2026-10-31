@@ -192,8 +192,9 @@ def authorize_tool(
     """Return a deterministic decision without I/O, mutation, or tool execution.
 
     Unknown names, missing/invalid context, sources, invocations and categories
-    fail closed. Model calls can only use READ_ONLY tools. No request arguments
-    or JSON confirmation flags are accepted, and a model proposal cannot upgrade
+    fail closed. Model calls and direct Telegram/bridge calls can only use
+    READ_ONLY tools. No request arguments or JSON confirmation flags are
+    accepted, and a model proposal cannot upgrade
     itself to DIRECT. An allow decision still requires executor-side argument,
     path, command and application validation.
     """
@@ -221,6 +222,11 @@ def authorize_tool(
         if spec.category is AccessCategory.READ_ONLY:
             return AuthorizationDecision(True, "allowed_read_only_model_call")
         return AuthorizationDecision(False, "direct_request_required")
-    if context.invocation is Invocation.DIRECT and spec.category in _DIRECT_CATEGORIES:
-        return AuthorizationDecision(True, "allowed_direct_request")
+    if context.invocation is Invocation.DIRECT:
+        if context.source in (RequestSource.TELEGRAM, RequestSource.BRIDGE):
+            if spec.category is AccessCategory.READ_ONLY:
+                return AuthorizationDecision(True, "allowed_read_only_remote_call")
+            return AuthorizationDecision(False, "remote_source_read_only")
+        if spec.category in _DIRECT_CATEGORIES:
+            return AuthorizationDecision(True, "allowed_direct_request")
     return AuthorizationDecision(False, "denied_by_default")
