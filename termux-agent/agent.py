@@ -17,6 +17,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from audit import record_event
 from security import AccessCategory, Invocation, RequestContext, RequestSource, TOOL_SPECS, authorize_tool, create_request_context
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -250,20 +251,39 @@ def _consume_permit(permit: object, name: str, arguments: dict[str, Any], contex
 
 
 def run_tool(name: str, arguments: dict[str, Any] | None = None, *, context: RequestContext | None = None, permit: object = None) -> dict[str, Any]:
+    source = context.source.value if type(context) is RequestContext and type(context.source) is RequestSource else "unknown"
+    invocation = context.invocation.value if type(context) is RequestContext and type(context.invocation) is Invocation else "unknown"
+
+    def audit(outcome: str, reason: str) -> None:
+        try:
+            record_event(tool=name, source=source, invocation=invocation, outcome=outcome, reason=reason)
+        except OSError as exc:
+            print(f"Security audit unavailable: {type(exc).__name__}", file=sys.stderr)
+
     decision = authorize_tool(name, context)
     if not decision.allowed:
+        audit("denied", decision.reason)
         raise ValueError(f"Инструмент запрещён политикой доступа: {decision.reason}")
     if name not in ALLOWED_TOOLS or name not in TOOLS:
+        audit("denied", "tool_not_available")
         raise ValueError("Такой инструмент не разрешён.")
     if arguments is not None and not isinstance(arguments, dict):
+        audit("denied", "invalid_arguments")
         raise ValueError("Аргументы инструмента должны быть объектом.")
     normalized = arguments if arguments is not None else {}
     spec = TOOL_SPECS[name]
     if spec.category is not AccessCategory.READ_ONLY:
         if (context.source is not RequestSource.CLI or context.invocation is not Invocation.DIRECT
                 or not _consume_permit(permit, name, normalized, context)):
+            audit("denied", "permit_required")
             raise ValueError("Для чувствительной команды требуется одноразовое подтверждение CLI.")
-    return TOOLS[name](normalized)
+    try:
+        result = TOOLS[name](normalized)
+    except Exception:
+        audit("error", "tool_execution_failed")
+        raise
+    audit("allowed", "executed")
+    return result
 
 
 def ask_model(text: str, *, context: RequestContext) -> str:
