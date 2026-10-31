@@ -114,14 +114,9 @@ fun BridgeScreen(onBack: () -> Unit) {
             Text(if (busy) "Проверяем…" else "Проверить соединение")
         }
         Button(
-            onClick = {
-                runRequest(
-                    "/v1/tool",
-                    JSONObject().put("tool", "device_status").put("arguments", JSONObject())
-                )
-            },
+            onClick = { runRequest("/v1/health") },
             enabled = !busy
-        ) { Text("Получить статус устройства") }
+        ) { Text("Статус Astra Bridge") }
         Button(
             onClick = {
                 runRequest(
