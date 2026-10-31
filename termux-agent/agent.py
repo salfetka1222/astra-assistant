@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import secrets
 import json
 import os
 import subprocess
@@ -217,7 +219,37 @@ TOOLS = {
 }
 
 
-def run_tool(name: str, arguments: dict[str, Any] | None = None, *, context: RequestContext | None = None) -> dict[str, Any]:
+class _OneTimePermit:
+    """Process-local, single-use authorization bound to one exact request."""
+    __slots__ = ("_nonce", "_fingerprint", "_context", "_used")
+
+    def __init__(self, nonce: object, fingerprint: str, context: RequestContext):
+        if nonce is not _PERMIT_ISSUER:
+            raise ValueError("Permit cannot be created by a caller.")
+        self._nonce = secrets.token_bytes(32)
+        self._fingerprint = fingerprint
+        self._context = context
+        self._used = False
+
+
+_PERMIT_ISSUER = object()
+
+
+def _request_fingerprint(name: str, arguments: dict[str, Any]) -> str:
+    serialized = json.dumps([name, arguments], sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _consume_permit(permit: object, name: str, arguments: dict[str, Any], context: RequestContext) -> bool:
+    if type(permit) is not _OneTimePermit or permit._used:
+        return False
+    # A failed attempt also consumes the permit, preventing replay.
+    permit._used = True
+    return (permit._context is context and
+            permit._fingerprint == _request_fingerprint(name, arguments))
+
+
+def run_tool(name: str, arguments: dict[str, Any] | None = None, *, context: RequestContext | None = None, permit: object = None) -> dict[str, Any]:
     decision = authorize_tool(name, context)
     if not decision.allowed:
         raise ValueError(f"Инструмент запрещён политикой доступа: {decision.reason}")
@@ -225,7 +257,13 @@ def run_tool(name: str, arguments: dict[str, Any] | None = None, *, context: Req
         raise ValueError("Такой инструмент не разрешён.")
     if arguments is not None and not isinstance(arguments, dict):
         raise ValueError("Аргументы инструмента должны быть объектом.")
-    return TOOLS[name](arguments or {})
+    normalized = arguments if arguments is not None else {}
+    spec = TOOL_SPECS[name]
+    if spec.category is not AccessCategory.READ_ONLY:
+        if (context.source is not RequestSource.CLI or context.invocation is not Invocation.DIRECT
+                or not _consume_permit(permit, name, normalized, context)):
+            raise ValueError("Для чувствительной команды требуется одноразовое подтверждение CLI.")
+    return TOOLS[name](normalized)
 
 
 def ask_model(text: str, *, context: RequestContext) -> str:
@@ -341,6 +379,22 @@ def telegram_loop() -> None:
             time.sleep(3)
 
 
+def issue_cli_permit(name: str, arguments: dict[str, Any], context: RequestContext) -> object | None:
+    """Only explicit local CLI requests can receive an in-process permit."""
+    if (type(context) is not RequestContext or context.source is not RequestSource.CLI
+            or context.invocation is not Invocation.DIRECT):
+        return None
+    if not authorize_tool(name, context).allowed or name not in TOOLS:
+        return None
+    if not isinstance(arguments, dict):
+        return None
+    if not confirm_cli_tool(name, arguments):
+        return None
+    if TOOL_SPECS[name].category is AccessCategory.READ_ONLY:
+        return None
+    return _OneTimePermit(_PERMIT_ISSUER, _request_fingerprint(name, arguments), context)
+
+
 def confirm_cli_tool(name: str, arguments: dict[str, Any]) -> bool:
     """Confirm a single explicit CLI operation; no remote/model approval path."""
     spec = TOOL_SPECS.get(name)
@@ -387,9 +441,13 @@ def main() -> int:
             parsed = json.loads(args.args)
             if not isinstance(parsed, dict):
                 raise ValueError("Аргументы инструмента должны быть объектом.")
-            if not confirm_cli_tool(args.tool, parsed):
-                raise ValueError("Действие не подтверждено; выполнение отменено.")
-            print(json.dumps(run_tool(args.tool, parsed, context=local_context), ensure_ascii=False, indent=2))
+            spec = TOOL_SPECS[args.tool]
+            permit = None
+            if spec.category is not AccessCategory.READ_ONLY:
+                permit = issue_cli_permit(args.tool, parsed, local_context)
+                if permit is None:
+                    raise ValueError("Действие не подтверждено; выполнение отменено.")
+            print(json.dumps(run_tool(args.tool, parsed, context=local_context, permit=permit), ensure_ascii=False, indent=2))
         else:
             parser.print_help()
     except (ValueError, RuntimeError, json.JSONDecodeError, subprocess.TimeoutExpired) as exc:
