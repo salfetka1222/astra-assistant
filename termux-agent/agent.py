@@ -15,7 +15,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from security import Invocation, RequestContext, RequestSource, authorize_tool, create_request_context
+from security import AccessCategory, Invocation, RequestContext, RequestSource, TOOL_SPECS, authorize_tool, create_request_context
 
 BASE_DIR = Path(__file__).resolve().parent
 WORKSPACE = Path(os.environ.get("AGENT_WORKSPACE", str(BASE_DIR / "workspace"))).resolve()
@@ -341,6 +341,24 @@ def telegram_loop() -> None:
             time.sleep(3)
 
 
+def confirm_cli_tool(name: str, arguments: dict[str, Any]) -> bool:
+    """Confirm a single explicit CLI operation; no remote/model approval path."""
+    spec = TOOL_SPECS.get(name)
+    if spec is None:
+        return False
+    if spec.category is AccessCategory.READ_ONLY:
+        return True
+    if not sys.stdin.isatty():
+        return False
+    print(f"Подтвердите однократное выполнение: {name}", file=sys.stderr)
+    print("Аргументы:", json.dumps(arguments, ensure_ascii=False, sort_keys=True), file=sys.stderr)
+    try:
+        response = input("Введите ДА для подтверждения: ")
+    except (EOFError, KeyboardInterrupt):
+        return False
+    return response.strip() == "ДА"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Astra Termux Agent MVP")
     parser.add_argument("--telegram", action="store_true", help="Запустить Telegram-бота")
@@ -367,6 +385,10 @@ def main() -> int:
             print(ask_model(args.ask, context=local_context))
         elif args.tool:
             parsed = json.loads(args.args)
+            if not isinstance(parsed, dict):
+                raise ValueError("Аргументы инструмента должны быть объектом.")
+            if not confirm_cli_tool(args.tool, parsed):
+                raise ValueError("Действие не подтверждено; выполнение отменено.")
             print(json.dumps(run_tool(args.tool, parsed, context=local_context), ensure_ascii=False, indent=2))
         else:
             parser.print_help()
