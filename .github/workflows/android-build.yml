@@ -41,7 +41,7 @@ jobs:
           gradle-version: "8.9"
 
       - name: Build debug APK
-        run: gradle -p android :app:assembleDebug
+        run: gradle -p android :app:testDebugUnitTest :app:assembleDebug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -99,8 +99,9 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: astra-v2
-          name: Astra 0.2.0
+          target_commitish: ${{ github.sha }}
+          tag_name: astra-v3
+          name: Astra 0.3.0
           prerelease: false
           draft: false
           files: |

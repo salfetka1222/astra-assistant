@@ -1,105 +1,87 @@
 package com.astra.assistant.ui
 
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.pm.PackageInfoCompat
+import com.astra.assistant.update.AstraRelease
+import com.astra.assistant.update.ReadyUpdate
+import com.astra.assistant.update.UpdateClient
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
-
-private const val RELEASE_API = "https://api.github.com/repos/salfetka1222/astra-assistant/releases/latest"
 
 @Composable
 fun UpdatesScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val client = remember(context) { UpdateClient(context) }
     val scope = rememberCoroutineScope()
-    val packageInfo = remember {
-        context.packageManager.getPackageInfo(context.packageName, 0)
-    }
-    val installedCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        packageInfo.longVersionCode
-    } else {
-        @Suppress("DEPRECATION")
-        packageInfo.versionCode.toLong()
-    }
+    val info = remember { context.packageManager.getPackageInfo(context.packageName, 0) }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("Нажми «Проверить», чтобы узнать о новой версии.") }
+    var release by remember { mutableStateOf<AstraRelease?>(null) }
+    var ready by remember { mutableStateOf<ReadyUpdate?>(null) }
+    var status by remember { mutableStateOf("Проверь, доступна ли новая версия Astra.") }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        TextButton(onClick = onBack) { Text("← Назад") }
-        Text("Обновления Astra", style = MaterialTheme.typography.headlineSmall)
-        Text("Установлена версия ${packageInfo.versionName ?: "неизвестна"} (код $installedCode)")
-        Text(
-            "Пока доступна только проверка версии. Установка из приложения будет включена после настройки постоянной подписи APK.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Button(
-            enabled = !busy,
-            onClick = {
-                busy = true
-                scope.launch {
-                    status = withContext(Dispatchers.IO) { checkLatestRelease(installedCode) }
-                    busy = false
-                }
-            }
-        ) { Text(if (busy) "Проверяем…" else "Проверить обновления") }
-        Text(status, modifier = Modifier.fillMaxWidth())
+    fun task(action: suspend () -> Unit) {
+        busy = true
+        scope.launch {
+            try { action() }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { status = e.message ?: "Не удалось выполнить действие. Повтори попытку." }
+            finally { busy = false }
+        }
     }
-}
 
-private fun checkLatestRelease(installedCode: Long): String {
-    var connection: HttpURLConnection? = null
-    return try {
-        connection = (URL(RELEASE_API).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 5000
-            readTimeout = 5000
-            instanceFollowRedirects = false
-            setRequestProperty("Accept", "application/vnd.github+json")
-            setRequestProperty("User-Agent", "Astra-Assistant-Updater")
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        TextButton(onClick = onBack, enabled = !busy) { Text("← Назад") }
+        Text("Обновления Astra", style = MaterialTheme.typography.headlineSmall)
+        Text("Версия ${info.versionName} (код ${PackageInfoCompat.getLongVersionCode(info)})")
+        Text("Astra проверит файл перед установкой. Установку подтверждаешь ты в окне Android.")
+        Button(enabled = !busy, onClick = {
+            task {
+                ready?.file?.delete()
+                ready = null
+                release = null
+                status = "Проверяем обновления…"
+                release = withContext(Dispatchers.IO) { client.latest() }
+                status = if (release == null) "Новая стабильная версия пока недоступна."
+                    else "Доступно обновление (код ${release!!.code})."
+            }
+        }) { Text("Проверить обновления") }
+        val available = release
+        if (available != null && ready == null) {
+            Button(enabled = !busy, onClick = {
+                task {
+                    status = "Скачиваем и проверяем APK… Оставь этот экран открытым."
+                    ready = withContext(Dispatchers.IO) { client.download(available) }
+                    status = "Файл проверен. Можно установить обновление."
+                }
+            }) { Text("Скачать обновление") }
         }
-        val responseCode = connection.responseCode
-        if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
-            return "Стабильный релиз Astra пока недоступен. Попробуй проверить обновления позже."
+        val downloaded = ready
+        if (downloaded != null) {
+            Button(enabled = !busy, onClick = {
+                task {
+                    if (!context.packageManager.canRequestPackageInstalls()) {
+                        status = "Разреши установку из Astra в настройках Android, вернись и снова нажми «Установить»."
+                        client.requestInstallPermission()
+                    } else {
+                        status = "Повторно проверяем файл…"
+                        withContext(Dispatchers.IO) { client.verify(downloaded) }
+                        client.install(downloaded)
+                        status = "Подтверди установку в окне Android. Если отменил — можно повторить."
+                    }
+                }
+            }) { Text("Установить") }
         }
-        if (responseCode != HttpURLConnection.HTTP_OK) {
-            return "Не удалось получить сведения о релизе (HTTP $responseCode)."
-        }
-        val data = connection.inputStream.bufferedReader().use { JSONObject(it.readText()) }
-        val tag = data.optString("tag_name")
-        val code = Regex("^astra-v(\\d+)$").matchEntire(tag)?.groupValues?.get(1)?.toLongOrNull()
-        if (code == null) {
-            "Пока нет совместимого релиза Astra. Текущий релиз GitHub не содержит проверяемого кода версии."
-        } else if (code > installedCode) {
-            "Найдена версия с кодом $code. Установка временно недоступна до настройки безопасной подписи APK."
-        } else {
-            "Установленная версия актуальна по данным опубликованного релиза (код $code)."
-        }
-    } catch (_: Exception) {
-        "Не удалось проверить обновления. Проверь подключение к интернету и повтори попытку."
-    } finally {
-        connection?.disconnect()
+        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        Text(status)
     }
 }
