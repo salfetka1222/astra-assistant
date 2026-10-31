@@ -59,16 +59,52 @@ class BridgeSafetyTests(unittest.TestCase):
         run_tool.assert_not_called()
 
     def test_read_only_tool_dispatches(self):
-        with patch.object(bridge, "run_tool", return_value={"count": 0, "memories": []}) as run_tool:
+        with patch.object(bridge, "run_tool", return_value={"entries": []}) as run_tool:
             status, payload = self.request(
                 "POST",
                 "/v1/tool",
-                {"tool": "memory_search", "arguments": {"query": "demo"}},
+                {"tool": "list_files", "arguments": {}},
                 token=self.token,
             )
         self.assertEqual(status, 200)
         self.assertTrue(payload["ok"])
-        run_tool.assert_called_once_with("memory_search", {"query": "demo"})
+        run_tool.assert_called_once()
+        args, kwargs = run_tool.call_args
+        self.assertEqual(args, ("list_files", {}))
+        self.assertEqual(kwargs["context"].source, bridge.RequestSource.BRIDGE)
+        self.assertEqual(kwargs["context"].invocation, bridge.Invocation.DIRECT)
+
+    def test_sensitive_reads_and_commands_blocked(self):
+        for name in ("read_file", "memory_search", "device_status", "safe_command", "clipboard_get"):
+            with self.subTest(name=name):
+                with patch.object(bridge, "run_tool") as runner:
+                    status, payload = self.request("POST", "/v1/tool",
+                        {"tool": name, "arguments": {}}, token=self.token)
+                    self.assertEqual(status, 403)
+                    self.assertEqual(payload["error"], "tool_not_allowed")
+                    runner.assert_not_called()
+
+    def test_wrong_token_rejected_before_dispatch(self):
+        with patch.object(bridge, "run_tool") as runner:
+            status, _ = self.request("POST", "/v1/tool",
+                {"tool": "list_files", "arguments": {}}, token="incorrect")
+            self.assertEqual(status, 401)
+            runner.assert_not_called()
+
+    def test_rejects_non_object_arguments(self):
+        with patch.object(bridge, "run_tool") as runner:
+            status, payload = self.request("POST", "/v1/tool",
+                {"tool": "list_files", "arguments": ["unexpected"]}, token=self.token)
+            self.assertEqual(status, 400)
+            self.assertEqual(payload["error"], "arguments_must_be_object")
+            runner.assert_not_called()
+
+    def test_executor_failure_has_generic_error(self):
+        with patch.object(bridge, "run_tool", side_effect=ValueError("PRIVATE_SECRET")):
+            status, payload = self.request("POST", "/v1/tool",
+                {"tool": "list_files", "arguments": {}}, token=self.token)
+            self.assertEqual(status, 403)
+            self.assertNotIn("PRIVATE_SECRET", json.dumps(payload))
 
 
 if __name__ == "__main__":
