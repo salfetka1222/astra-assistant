@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.ComponentName
 import android.provider.Settings
 import android.content.Intent
+import android.media.AudioManager
+import androidx.compose.material3.AlertDialog
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -64,6 +66,13 @@ fun BridgeScreen(onBack: () -> Unit) {
     var memoryQuery by remember { mutableStateOf("") }
     var result by remember { mutableStateOf("Мост пока не проверен.") }
     var busy by remember { mutableStateOf(false) }
+    var pendingLaunch by remember { mutableStateOf<Pair<String, Intent>?>(null) }
+    var actionHistory by remember { mutableStateOf(listOf<String>()) }
+    fun recordAction(label: String, success: Boolean) {
+        actionHistory = (listOf("${if (success) "✓" else "✕"} $label") + actionHistory).take(12)
+        result = if (success) "Команда «$label» отправлена Android." else "Не удалось выполнить «$label»."
+    }
+
     val scope = rememberCoroutineScope()
     var accessibilityEnabled by remember { mutableStateOf(isAstraAccessibilityEnabled(context)) }
     val accessibilityPrefs = remember(context) {
@@ -135,6 +144,23 @@ fun BridgeScreen(onBack: () -> Unit) {
         }
     }
 
+    pendingLaunch?.let { (label, intent) ->
+        AlertDialog(
+            onDismissRequest = { pendingLaunch = null },
+            title = { Text("Открыть приложение?") },
+            text = { Text("Astra запустит: $label") },
+            confirmButton = { TextButton(onClick = {
+                pendingLaunch = null
+                val success = try {
+                    context.startActivity(intent)
+                    true
+                } catch (_: Exception) { false }
+                recordAction("Открыть $label", success)
+            }) { Text("Открыть") } },
+            dismissButton = { TextButton(onClick = { pendingLaunch = null }) { Text("Отмена") } }
+        )
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -158,17 +184,43 @@ fun BridgeScreen(onBack: () -> Unit) {
                         enabled = accessibilityEnabled,
                         onClick = {
                             AstraAccessibilityService.performManualAction(action) { success ->
-                                result = if (success) "Команда «$label» отправлена Android."
-                                else "Не удалось выполнить «$label». Проверь службу Accessibility."
+                                recordAction(label, success)
                             }
                         }
                     ) { Text(label) }
                 }
             }
         }
+        Text("Быстрые инструменты", style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(modifier = Modifier.weight(1f), onClick = {
+                val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
+                recordAction("Громкость +", true)
+            }) { Text("Громкость +") }
+            OutlinedButton(modifier = Modifier.weight(1f), onClick = {
+                val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
+                recordAction("Громкость −", true)
+            }) { Text("Громкость −") }
+        }
+        Text("Запуск приложений — только после подтверждения", style = MaterialTheme.typography.titleMedium)
+        val launchOptions = listOf(
+            "Настройки Android" to Intent(Settings.ACTION_SETTINGS),
+            "Настройки Wi-Fi" to Intent(Settings.ACTION_WIFI_SETTINGS),
+            "Браузер" to Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.google.com"))
+        )
+        launchOptions.forEach { (label, intent) ->
+            OutlinedButton(onClick = { pendingLaunch = label to intent }) { Text("Открыть: $label") }
+        }
+        if (actionHistory.isNotEmpty()) {
+            Text("История действий (только в текущем сеансе)", style = MaterialTheme.typography.titleMedium)
+            actionHistory.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+            TextButton(onClick = { actionHistory = emptyList() }) { Text("Очистить историю") }
+        }
         Text("Специальные возможности Android", style = MaterialTheme.typography.titleMedium)
         Text(if (accessibilityEnabled) "Astra Accessibility: включена" else "Astra Accessibility: выключена")
-        Text("Текущая служба только определяет активное приложение. Нажатия и ввод текста пока недоступны.")
+        Text("Служба поддерживает ручную навигацию и прокрутку. Чтение содержимого чужих приложений и автоматический ввод отключены.")
         if (accessibilityEnabled && lastPackage.isNotBlank()) {
             Text("Последнее активное приложение: $lastPackage")
         }
