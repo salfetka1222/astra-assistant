@@ -143,6 +143,29 @@ fun BridgeScreen(onBack: () -> Unit) {
             TextButton(onClick = onBack) { Text("← Назад") }
             Text("Мост Termux", style = MaterialTheme.typography.headlineSmall)
         }
+        Text("Управление Android", style = MaterialTheme.typography.titleMedium)
+        Text("Действия выполняются только по нажатию кнопки. Astra не читает текст других приложений.")
+        val actions = listOf(
+            "back" to "Назад", "home" to "Домой", "recents" to "Недавние",
+            "notifications" to "Уведомления", "quick_settings" to "Быстрые настройки",
+            "scroll_up" to "Прокрутить вверх", "scroll_down" to "Прокрутить вниз"
+        )
+        actions.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair.forEach { (action, label) ->
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        enabled = accessibilityEnabled,
+                        onClick = {
+                            AstraAccessibilityService.performManualAction(action) { success ->
+                                result = if (success) "Команда «$label» отправлена Android."
+                                else "Не удалось выполнить «$label». Проверь службу Accessibility."
+                            }
+                        }
+                    ) { Text(label) }
+                }
+            }
+        }
         Text("Специальные возможности Android", style = MaterialTheme.typography.titleMedium)
         Text(if (accessibilityEnabled) "Astra Accessibility: включена" else "Astra Accessibility: выключена")
         Text("Текущая служба только определяет активное приложение. Нажатия и ввод текста пока недоступны.")
