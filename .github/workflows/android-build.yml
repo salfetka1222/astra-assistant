@@ -99,13 +99,20 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/astra-release.jks"
 
-      - name: Check release tag
+      - name: Validate release branch and unused tag
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh api repos/${{ github.repository }}/git/ref/tags/astra-v4 >/dev/null 2>&1; then
-            echo "Tag astra-v4 already exists"
+          test "$GITHUB_REF" = "refs/heads/feature/in-app-updates" || { echo "Unexpected release branch: $GITHUB_REF"; exit 1; }
+          status=$(curl --silent --show-error --output "$RUNNER_TEMP/astra-tag-response.json" --write-out '%{http_code}' \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/git/ref/tags/astra-v4") || exit 1
+          if [ "$status" = 404 ]; then
+            echo "Tag astra-v4 is available"
+          else
+            echo "Refusing publication: tag lookup returned HTTP $status"
             exit 1
           fi
 
