@@ -100,8 +100,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           target_commitish: ${{ github.sha }}
-          tag_name: astra-v3
-          name: Astra 0.3.0
+          tag_name: astra-v4
+          name: Astra 0.4.0
           prerelease: false
           draft: false
           files: |
