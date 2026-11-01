@@ -1,6 +1,9 @@
 package com.astra.assistant.ui
 
 import android.content.Context
+import android.content.ComponentName
+import android.provider.Settings
+import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,11 +16,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.astra.assistant.AstraAccessibilityService
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -32,6 +38,18 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+
+private fun isAstraAccessibilityEnabled(context: Context): Boolean {
+    val enabled = Settings.Secure.getInt(
+        context.contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED, 0
+    ) == 1
+    if (!enabled) return false
+    val configured = Settings.Secure.getString(
+        context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+    ).orEmpty()
+    val target = ComponentName(context, AstraAccessibilityService::class.java)
+    return configured.split(':').any { ComponentName.unflattenFromString(it) == target }
+}
 
 private const val BRIDGE_PREFS = "astra_bridge_preferences"
 private const val BRIDGE_TOKEN_KEY = "bridge_token"
@@ -47,6 +65,23 @@ fun BridgeScreen(onBack: () -> Unit) {
     var result by remember { mutableStateOf("Мост пока не проверен.") }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    var accessibilityEnabled by remember { mutableStateOf(isAstraAccessibilityEnabled(context)) }
+    val accessibilityPrefs = remember(context) {
+        context.getSharedPreferences(AstraAccessibilityService.PREFS_NAME, Context.MODE_PRIVATE)
+    }
+    var lastPackage by remember { mutableStateOf("") }
+    var lastEventAt by remember { mutableStateOf(0L) }
+    fun refreshAccessibility() {
+        accessibilityEnabled = isAstraAccessibilityEnabled(context)
+        lastPackage = accessibilityPrefs.getString(
+            AstraAccessibilityService.ACCESSIBILITY_CURRENT_PACKAGE, ""
+        ).orEmpty()
+        lastEventAt = accessibilityPrefs.getLong(
+            AstraAccessibilityService.ACCESSIBILITY_LAST_EVENT_AT, 0L
+        )
+    }
+    LaunchedEffect(Unit) { refreshAccessibility() }
+
 
     fun runRequest(path: String, body: JSONObject? = null) {
         if (token.trim().length < 32) {
@@ -107,6 +142,18 @@ fun BridgeScreen(onBack: () -> Unit) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
             TextButton(onClick = onBack) { Text("← Назад") }
             Text("Мост Termux", style = MaterialTheme.typography.headlineSmall)
+        }
+        Text("Специальные возможности Android", style = MaterialTheme.typography.titleMedium)
+        Text(if (accessibilityEnabled) "Astra Accessibility: включена" else "Astra Accessibility: выключена")
+        Text("Текущая служба только определяет активное приложение. Нажатия и ввод текста пока недоступны.")
+        if (accessibilityEnabled && lastPackage.isNotBlank()) {
+            Text("Последнее активное приложение: $lastPackage")
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { refreshAccessibility() }) { Text("Обновить статус") }
+            OutlinedButton(onClick = {
+                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }) { Text("Настройки") }
         }
         Text(
             "Соединение только с Termux на этом телефоне через 127.0.0.1:8765. Токен хранится в приватных настройках приложения. Не отправляй его другим людям.",
