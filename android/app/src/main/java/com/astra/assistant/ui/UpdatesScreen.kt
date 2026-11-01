@@ -51,8 +51,8 @@ fun UpdatesScreen(onBack: () -> Unit) {
                 release = null
                 status = "Проверяем обновления…"
                 release = withContext(Dispatchers.IO) { client.latest() }
-                status = if (release == null) "Новая стабильная версия пока недоступна."
-                    else "Доступно обновление (код ${release!!.code})."
+                status = if (release == null) "Установлена актуальная стабильная версия."
+                    else "Найдено обновление (код ${release!!.code}). Нажми «Скачать обновление», чтобы проверить APK."
             }
         }) { Text("Проверить обновления") }
         val available = release
@@ -61,7 +61,7 @@ fun UpdatesScreen(onBack: () -> Unit) {
                 task {
                     status = "Скачиваем и проверяем APK… Оставь этот экран открытым."
                     ready = withContext(Dispatchers.IO) { client.download(available) }
-                    status = "Файл проверен. Можно установить обновление."
+                    status = "APK проверен: контрольная сумма, версия и подпись совпадают. Нажми «Установить»."
                 }
             }) { Text("Скачать обновление") }
         }
