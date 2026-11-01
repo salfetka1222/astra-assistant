@@ -21,6 +21,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: astra-android-release
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build debug APK
