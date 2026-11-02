@@ -60,6 +60,35 @@ class BridgeSafetyTests(unittest.TestCase):
             connection.close()
             runner.assert_not_called()
 
+    def test_connection_slots_reject_excess_and_recover(self):
+        import socket
+        held = []
+        try:
+            for _ in range(bridge.MAX_CONCURRENT_CONNECTIONS):
+                sock = socket.create_connection((bridge.HOST, self.port), timeout=2)
+                sock.sendall(b"GET /v1/health HTTP/1.1\r\nHost: localhost\r\n")
+                held.append(sock)
+            # Wait until all partial requests have been accepted by workers.
+            import time
+            deadline = time.monotonic() + 2
+            while self.server._connection_slots._value != 0 and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertEqual(self.server._connection_slots._value, 0)
+            extra = socket.create_connection((bridge.HOST, self.port), timeout=2)
+            extra.settimeout(2)
+            try:
+                extra.sendall(b"GET /v1/health HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                self.assertEqual(extra.recv(1), b"")
+            finally:
+                extra.close()
+        finally:
+            for sock in held:
+                sock.close()
+        deadline = time.monotonic() + 2
+        while self.server._connection_slots._value != bridge.MAX_CONCURRENT_CONNECTIONS and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(self.request("GET", "/v1/health", token=self.token)[0], 200)
+
     def test_rate_limit_returns_429_and_recovers(self):
         with patch.object(bridge, "RATE_MAX_REQUESTS", 2):
             self.assertEqual(self.request("GET", "/v1/health", token=self.token)[0], 200)

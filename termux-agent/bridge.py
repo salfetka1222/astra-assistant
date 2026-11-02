@@ -25,6 +25,7 @@ DEFAULT_PORT = 8765
 MAX_BODY_BYTES = 8192
 RATE_WINDOW_SECONDS = 10
 RATE_MAX_REQUESTS = 30
+MAX_CONCURRENT_CONNECTIONS = 8
 READ_ONLY_TOOLS = frozenset({"list_files"})
 
 
@@ -41,7 +42,26 @@ class AstraBridgeServer(ThreadingHTTPServer):
         self.started_at = time.monotonic()
         self._rate_lock = threading.Lock()
         self._recent_requests = deque()
+        self._connection_slots = threading.BoundedSemaphore(MAX_CONCURRENT_CONNECTIONS)
         super().__init__(server_address, AstraBridgeHandler)
+
+    def process_request(self, request: Any, client_address: Any) -> None:
+        # Reserve a slot before spawning a worker; stalled clients cannot
+        # create an unbounded number of handler threads.
+        if not self._connection_slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._connection_slots.release()
+            raise
+
+    def process_request_thread(self, request: Any, client_address: Any) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._connection_slots.release()
 
     def allow_request(self) -> bool:
         now = time.monotonic()
