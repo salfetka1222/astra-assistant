@@ -55,17 +55,26 @@ import com.astra.assistant.data.MessageEntity
 fun ChatScreen(
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
+    accent: String,
+    onAccentChange: (String) -> Unit,
+    buttonSize: String,
+    onButtonSizeChange: (String) -> Unit,
     viewModel: ChatViewModel = viewModel()
 ) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     var draft by rememberSaveable { mutableStateOf("") }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showSetup by rememberSaveable { mutableStateOf(false) }
+    var showAbout by rememberSaveable { mutableStateOf(false) }
     var showBridge by rememberSaveable { mutableStateOf(false) }
     var showUpdates by rememberSaveable { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     val context = LocalContext.current
+    val cardPadding = when (buttonSize) { "extra" -> 30.dp; "large" -> 24.dp; else -> 18.dp }
     var deviceSummary by remember { mutableStateOf("Нажми «Обновить состояние», чтобы получить показатели.") }
 
+    if (showSetup) { AstraSetupScreen(onBack = { showSetup = false }); return }
+    if (showAbout) { AboutAstraScreen(onBack = { showAbout = false }); return }
     if (showUpdates) {
         UpdatesScreen(onBack = { showUpdates = false })
         return
@@ -81,7 +90,11 @@ fun ChatScreen(
             themeMode = themeMode,
             onThemeModeChange = onThemeModeChange,
             onBack = { showSettings = false },
-            onUpdates = { showSettings = false; showUpdates = true }
+            onUpdates = { showSettings = false; showUpdates = true },
+            accent = accent, onAccentChange = onAccentChange,
+            buttonSize = buttonSize, onButtonSizeChange = onButtonSizeChange,
+            onSetup = { showSettings = false; showSetup = true },
+            onAbout = { showSettings = false; showAbout = true }
         )
         return
     }
@@ -160,16 +173,22 @@ fun ChatScreen(
                             }) { Text("Обновить состояние") }
                         }
                     }
+                    Card(onClick = { showSetup = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) {
+                        Column(Modifier.padding(cardPadding)) {
+                            Text("Как подключить Astra", style = MaterialTheme.typography.titleMedium)
+                            Text("Пошаговая настройка Termux и Android")
+                        }
+                    }
                     Card(onClick = { showBridge = true }, modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(24.dp)) {
-                        Column(modifier = Modifier.padding(18.dp)) {
+                        Column(modifier = Modifier.padding(cardPadding)) {
                             Text("Termux Bridge", style = MaterialTheme.typography.titleMedium)
                             Text("Подключение и команды", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     Card(onClick = { showSettings = true }, modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(24.dp)) {
-                        Column(modifier = Modifier.padding(18.dp)) {
+                        Column(modifier = Modifier.padding(cardPadding)) {
                             Text("Настройки и обновления", style = MaterialTheme.typography.titleMedium)
                             Text("Тема, версия и безопасность", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -227,7 +246,10 @@ private fun SettingsScreen(
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
     onBack: () -> Unit,
-    onUpdates: () -> Unit
+    onUpdates: () -> Unit,
+    accent: String, onAccentChange: (String) -> Unit,
+    buttonSize: String, onButtonSizeChange: (String) -> Unit,
+    onSetup: () -> Unit, onAbout: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -291,7 +313,23 @@ private fun SettingsScreen(
         }
 
         Spacer(Modifier.height(24.dp))
+        Text("Цвет темы", style = MaterialTheme.typography.titleLarge)
+        listOf("red" to "Красный", "blue" to "Синий", "green" to "Зелёный", "purple" to "Фиолетовый").forEach { (key, title) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = accent == key, onClick = { onAccentChange(key) })
+                TextButton(onClick = { onAccentChange(key) }) { Text(title) }
+            }
+        }
+        Text("Размер кнопок главной", style = MaterialTheme.typography.titleLarge)
+        listOf("normal" to "Обычные", "large" to "Крупные", "extra" to "Очень крупные").forEach { (key, title) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = buttonSize == key, onClick = { onButtonSizeChange(key) })
+                TextButton(onClick = { onButtonSizeChange(key) }) { Text(title) }
+            }
+        }
+        Button(onClick = onSetup) { Text("Как подключить Astra") }
         Button(onClick = onUpdates) { Text("Проверить обновления Astra") }
+        Button(onClick = onAbout) { Text("О приложении") }
 
         Spacer(Modifier.height(24.dp))
         Text("О приложении", style = MaterialTheme.typography.titleLarge)
