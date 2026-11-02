@@ -54,6 +54,7 @@ import com.astra.assistant.data.MessageEntity
 @Composable
 fun ChatScreen(
     themeMode: ThemeMode,
+    onShowWhatsNew: () -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
     accent: String,
     onAccentChange: (String) -> Unit,
@@ -91,6 +92,7 @@ fun ChatScreen(
             onThemeModeChange = onThemeModeChange,
             onBack = { showSettings = false },
             onUpdates = { showSettings = false; showUpdates = true },
+            onShowWhatsNew = onShowWhatsNew,
             accent = accent, onAccentChange = onAccentChange,
             buttonSize = buttonSize, onButtonSizeChange = onButtonSizeChange,
             onSetup = { showSettings = false; showSetup = true },
@@ -247,6 +249,7 @@ private fun SettingsScreen(
     onThemeModeChange: (ThemeMode) -> Unit,
     onBack: () -> Unit,
     onUpdates: () -> Unit,
+    onShowWhatsNew: () -> Unit,
     accent: String, onAccentChange: (String) -> Unit,
     buttonSize: String, onButtonSizeChange: (String) -> Unit,
     onSetup: () -> Unit, onAbout: () -> Unit
@@ -329,6 +332,7 @@ private fun SettingsScreen(
         }
         Button(onClick = onSetup) { Text("Как подключить Astra") }
         Button(onClick = onUpdates) { Text("Проверить обновления Astra") }
+        Button(onClick = onShowWhatsNew) { Text("Что нового в Astra") }
         Button(onClick = onAbout) { Text("О приложении") }
 
         Spacer(Modifier.height(24.dp))

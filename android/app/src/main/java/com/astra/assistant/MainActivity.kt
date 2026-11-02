@@ -17,12 +17,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import com.astra.assistant.ui.ChatScreen
+import com.astra.assistant.ui.WhatsNewCatalog
+import com.astra.assistant.ui.WhatsNewDialog
 
 private const val PREFS_NAME = "astra_preferences"
 private const val THEME_KEY = "theme_mode"
 private const val ACCENT_KEY = "accent_color"
 private const val BUTTON_KEY = "button_size"
 private const val RELEASE_WELCOME_KEY = "release_1_0_welcome_seen"
+private const val LAST_CHANGELOG_KEY = "last_seen_major_changelog"
 
 enum class ThemeMode(val storageValue: String, val title: String) {
     SYSTEM("system", "Как в системе"),
@@ -40,6 +43,7 @@ class MainActivity : ComponentActivity() {
     private var accent by mutableStateOf("red")
     private var buttonSize by mutableStateOf("normal")
     private var showReleaseWelcome by mutableStateOf(false)
+    private var showWhatsNew by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,6 +55,7 @@ class MainActivity : ComponentActivity() {
         accent = prefs.getString(ACCENT_KEY, "red") ?: "red"
         buttonSize = prefs.getString(BUTTON_KEY, "normal") ?: "normal"
         showReleaseWelcome = !prefs.getBoolean(RELEASE_WELCOME_KEY, false)
+        showWhatsNew = prefs.getString(LAST_CHANGELOG_KEY, null) != WhatsNewCatalog.current.id
         setContent {
             val darkTheme = when (themeMode) {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -141,6 +146,7 @@ class MainActivity : ComponentActivity() {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     ChatScreen(
                         themeMode = themeMode,
+                        onShowWhatsNew = { showWhatsNew = true },
                         accent = accent, onAccentChange = { accent = it; prefs.edit().putString(ACCENT_KEY, it).apply() },
                         buttonSize = buttonSize, onButtonSizeChange = { buttonSize = it; prefs.edit().putString(BUTTON_KEY, it).apply() },
                         onThemeModeChange = { newMode ->
@@ -151,6 +157,13 @@ class MainActivity : ComponentActivity() {
                                 .apply()
                         }
                     )
+                    if (showWhatsNew && !showReleaseWelcome) {
+                        WhatsNewDialog(WhatsNewCatalog.current) {
+                            if (prefs.edit().putString(LAST_CHANGELOG_KEY, WhatsNewCatalog.current.id).commit()) {
+                                showWhatsNew = false
+                            }
+                        }
+                    }
                     if (showReleaseWelcome) {
                         AlertDialog(
                             onDismissRequest = { dismissReleaseWelcome(prefs) },
