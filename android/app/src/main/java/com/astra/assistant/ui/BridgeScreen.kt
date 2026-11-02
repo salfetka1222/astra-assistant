@@ -206,9 +206,6 @@ fun BridgeScreen(onBack: () -> Unit) {
                 manager.getMemoryInfo(memory)
                 val mib = 1024L * 1024L
                 val storage = StatFs(Environment.getDataDirectory().absolutePath)
-                result = "Батарея: $batteryText\n" +
-                    "Свободная ОЗУ: ${memory.availMem / mib} МиБ\n" +
-                    "Свободное хранилище: ${storage.availableBytes / mib} МиБ"
                 recordAction("Диагностика устройства", true)
                 result = "Батарея: $batteryText\n" +
                     "Свободная ОЗУ: ${memory.availMem / mib} МиБ\n" +
