@@ -6,10 +6,11 @@
 - [x] Check versionCode 14 before release; verify tag is unused.
 - [ ] Verify signing secrets and that a signed candidate upgrades the existing installed app without losing data.
 - [ ] Generate SHA-256 and APK size from the actual signed release artifact.
-- [ ] Publish matching `latest.json` to the update feed used by UpdateClient (currently `feature/in-app-updates/updates/latest.json`) only after the signed release is available.
+- [x] Switch UpdateClient to GitHub Releases latest API, reading asset size and download URLs directly from the published release.
+- [ ] Verify the public GitHub latest release resolves to `astra-v14` only after final publication.
 - [ ] Verify in-app update download, signature check, Android install prompt and persistence after upgrade on a device.
 - [ ] Test onboarding on a clean install with Termux, token connection, permission setup and offline/error states.
 - [ ] Confirm the chat is clearly described as a demo engine, not a connected language model.
 - [ ] Obtain explicit approval before publishing the public release.
 
-Do not enable `publish_release` until candidate upgrade is tested, versionName is final, and the legacy updater feed is ready to point at the new release.
+Do not enable `publish_release` until candidate upgrade and updater flow are tested, and versionName is final. The legacy latest.json is no longer used by new builds; older installed versions may still read it.
