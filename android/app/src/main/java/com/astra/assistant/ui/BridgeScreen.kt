@@ -81,6 +81,21 @@ fun BridgeScreen(onBack: () -> Unit) {
         result = if (success) "Команда «$label» отправлена Android." else "Не удалось выполнить «$label»."
     }
 
+    fun runApprovedSequence(label: String, actions: List<String>) {
+        // Only predefined, short navigation sequences are accepted from explicit UI taps.
+        if (actions.isEmpty() || actions.size > 2 || actions.any { it !in setOf("notifications", "quick_settings", "back", "home") }) {
+            recordAction(label, false)
+            return
+        }
+        fun next(index: Int) {
+            AstraAccessibilityService.performManualAction(actions[index]) { success ->
+                if (!success || index == actions.lastIndex) recordAction(label, success)
+                else next(index + 1)
+            }
+        }
+        next(0)
+    }
+
     val scope = rememberCoroutineScope()
     var accessibilityEnabled by remember { mutableStateOf(isAstraAccessibilityEnabled(context)) }
     val accessibilityPrefs = remember(context) {
@@ -182,6 +197,14 @@ fun BridgeScreen(onBack: () -> Unit) {
                 }
             }
         }
+        Text("Готовые сценарии Android", style = MaterialTheme.typography.titleMedium)
+        Text("Каждый сценарий запускается только отдельным нажатием и содержит не более двух заранее разрешённых действий.")
+        OutlinedButton(enabled = accessibilityEnabled, onClick = {
+            runApprovedSequence("Открыть быстрые настройки", listOf("notifications", "quick_settings"))
+        }) { Text("Уведомления → Быстрые настройки") }
+        OutlinedButton(enabled = accessibilityEnabled, onClick = {
+            runApprovedSequence("Вернуться на главный экран", listOf("back", "home"))
+        }) { Text("Назад → Домой") }
         Text("Быстрые инструменты", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(modifier = Modifier.weight(1f), onClick = {
