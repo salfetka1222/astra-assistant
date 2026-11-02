@@ -66,9 +66,9 @@ class MainActivity : ComponentActivity() {
                     surfaceVariant = Color(0xFFF3DDDE),
                     onBackground = Color(0xFF291719),
                     onSurface = Color(0xFF291719),
-                    onSurfaceVariant = Color(0xFF49485A),
-                    primaryContainer = Color(0xFFDEDEFF),
-                    onPrimaryContainer = Color(0xFF24234A)
+                    onSurfaceVariant = Color(0xFF655052),
+                    primaryContainer = Color(0xFFFFDADB),
+                    onPrimaryContainer = Color(0xFF702E35)
                 )
             }
 

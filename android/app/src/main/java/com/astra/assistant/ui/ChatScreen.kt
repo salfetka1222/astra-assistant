@@ -1,6 +1,8 @@
 package com.astra.assistant.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.astra.assistant.ThemeMode
@@ -75,13 +79,16 @@ fun ChatScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+            NavigationBar(
+                modifier = Modifier.heightIn(min = 92.dp),
+                containerColor = MaterialTheme.colorScheme.surface
+            ) {
                 listOf("Главная", "Чат", "Инструменты").forEachIndexed { index, label ->
                     NavigationBarItem(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
-                        icon = { Text(listOf("⌂", "✦", "⚙")[index]) },
-                        label = { Text(label) }
+                        icon = { Text(listOf("⌂", "✦", "⚙")[index], fontSize = 27.sp) },
+                        label = { Text(label, style = MaterialTheme.typography.labelLarge) }
                     )
                 }
             }
@@ -93,14 +100,18 @@ fun ChatScreen(
         ) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("ASTRA", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-                    Text("EVOLUTION • локальный режим", style = MaterialTheme.typography.labelMedium,
+                    Text("ASTRA", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                    Text("EVOLUTION • локальный режим", maxLines = 1, style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                TextButton(onClick = { showSettings = true }) { Text("Настройки") }
+                TextButton(onClick = { showSettings = true }) { Text("⚙") }
             }
             when (selectedTab) {
                 0 -> {
+                    Column(
+                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(28.dp),
@@ -128,6 +139,7 @@ fun ChatScreen(
                             Text("Тема, версия и безопасность", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    }
                 }
                 1 -> {
                     LazyColumn(
@@ -147,6 +159,10 @@ fun ChatScreen(
                     TextButton(onClick = viewModel::clearHistory) { Text("Очистить историю") }
                 }
                 else -> {
+                    Column(
+                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                     Card(onClick = { showBridge = true }, modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(24.dp)) {
                         Column(modifier = Modifier.padding(20.dp)) {
@@ -164,6 +180,7 @@ fun ChatScreen(
                     Text("Shizuku и новые инструменты появятся на следующих этапах.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
