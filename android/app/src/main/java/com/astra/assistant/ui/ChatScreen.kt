@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -232,6 +233,8 @@ private fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .safeDrawingPadding()
+            .verticalScroll(rememberScrollState())
             .padding(20.dp)
     ) {
         Row(
@@ -294,7 +297,7 @@ private fun SettingsScreen(
         Text("О приложении", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Astra Evolution • предварительный дизайн 1.0\nСейчас работает локально. Выбор темы сохраняется на устройстве.",
+            "Astra Evolution • Beta 3\nЛокальный режим. Настройки темы сохраняются на устройстве. Расширенная персонализация и сведения о создателях появятся в релизе 1.0.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
