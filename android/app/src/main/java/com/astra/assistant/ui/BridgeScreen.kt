@@ -71,6 +71,7 @@ fun BridgeScreen(onBack: () -> Unit) {
     var memoryQuery by remember { mutableStateOf("") }
     var result by remember { mutableStateOf("Мост пока не проверен.") }
     var busy by remember { mutableStateOf(false) }
+    var supportedTools by remember { mutableStateOf(setOf<String>()) }
     val historyPrefs = remember(context) { context.getSharedPreferences("astra_action_history", Context.MODE_PRIVATE) }
     fun readHistory(): List<String> = historyPrefs.getString("entries", "").orEmpty()
         .lines().filter { it.isNotBlank() }.take(30)
@@ -120,10 +121,14 @@ fun BridgeScreen(onBack: () -> Unit) {
             result = "Вставь токен из Termux (не менее 32 символов)."
             return
         }
+        if (path == "/v1/tool" && (body == null || body.optString("tool") !in supportedTools)) {
+            result = "Инструмент недоступен в текущей версии моста. Проверь статус подключения."
+            return
+        }
         busy = true
         prefs.edit().putString(BRIDGE_TOKEN_KEY, token.trim()).apply()
         scope.launch {
-            result = withContext(Dispatchers.IO) {
+            val response = withContext(Dispatchers.IO) {
                 try {
                     val connection = (URL(BRIDGE_BASE_URL + path).openConnection() as HttpURLConnection).apply {
                         requestMethod = if (body == null) "GET" else "POST"
@@ -148,21 +153,23 @@ fun BridgeScreen(onBack: () -> Unit) {
                             val uptime = health.optLong("uptime_seconds", 0)
                             val tools = health.optJSONArray("tools")
                             val available = (0 until (tools?.length() ?: 0)).joinToString(", ") { tools?.optString(it).orEmpty() }
-                            "Astra Bridge: ${health.optString("status", "неизвестно")}\n" +
+                            Pair("Astra Bridge: ${health.optString("status", "неизвестно")}\n" +
                                 "Соединение: ${health.optString("transport", "неизвестно")}\n" +
                                 "Время работы: ${uptime} сек.\n" +
-                                "Разрешённые инструменты: $available"
+                                "Разрешённые инструменты: $available", (0 until (tools?.length() ?: 0)).map { tools?.optString(it).orEmpty() }.toSet())
                         } else {
-                            "HTTP $status\n$text"
+                            Pair("HTTP $status\n$text", emptySet<String>())
                         }
                     } finally {
                         connection.disconnect()
                     }
                 } catch (error: Exception) {
                     Log.w("AstraBridge", "Bridge request failed: ${error.javaClass.simpleName}")
-                    "Нет соединения. Проверь, что в Termux запущен python bridge.py, порт 8765 доступен и токен правильный.\nПричина: ${error.javaClass.simpleName}"
+                    Pair("Нет соединения. Проверь, что в Termux запущен python bridge.py, порт 8765 доступен и токен правильный.\nПричина: ${error.javaClass.simpleName}", emptySet<String>())
                 }
             }
+            result = response.first
+            if (path == "/v1/health" || response.second.isNotEmpty()) supportedTools = response.second
             busy = false
         }
     }
@@ -283,7 +290,7 @@ fun BridgeScreen(onBack: () -> Unit) {
         )
         OutlinedTextField(
             value = token,
-            onValueChange = { token = it },
+            onValueChange = { token = it; supportedTools = emptySet() },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Токен из Termux") },
             visualTransformation = PasswordVisualTransformation(),
@@ -301,10 +308,11 @@ fun BridgeScreen(onBack: () -> Unit) {
                     JSONObject().put("tool", "list_files").put("arguments", JSONObject().put("path", "."))
                 )
             },
-            enabled = !busy
+            enabled = !busy && "list_files" in supportedTools
         ) { Text("Показать workspace") }
 
         Text("Чтение файла workspace", style = MaterialTheme.typography.titleMedium)
+        if ("read_file" !in supportedTools) Text("Чтение файлов отключено сервером моста. Доступен только список файлов.")
         OutlinedTextField(
             value = filePath,
             onValueChange = { filePath = it },
@@ -326,10 +334,11 @@ fun BridgeScreen(onBack: () -> Unit) {
                     )
                 }
             },
-            enabled = !busy
+            enabled = !busy && "read_file" in supportedTools
         ) { Text("Прочитать файл") }
 
         Text("Поиск локальной памяти", style = MaterialTheme.typography.titleMedium)
+        if ("memory_search" !in supportedTools) Text("Поиск памяти отключён сервером моста.")
         OutlinedTextField(
             value = memoryQuery,
             onValueChange = { memoryQuery = it },
@@ -346,7 +355,7 @@ fun BridgeScreen(onBack: () -> Unit) {
                         .put("arguments", JSONObject().put("query", memoryQuery.trim()))
                 )
             },
-            enabled = !busy
+            enabled = !busy && "memory_search" in supportedTools
         ) { Text("Найти в памяти") }
 
         Spacer(Modifier.height(4.dp))
