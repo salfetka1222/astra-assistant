@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.platform.LocalContext
 import com.astra.assistant.AstraAccessibilityService
+import com.astra.assistant.core.NavigationSequences
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -82,9 +83,9 @@ fun BridgeScreen(onBack: () -> Unit) {
         result = if (success) "Команда «$label» отправлена Android." else "Не удалось выполнить «$label»."
     }
 
-    fun runApprovedSequence(label: String, actions: List<String>) {
-        // Only predefined, short navigation sequences are accepted from explicit UI taps.
-        if (actions.isEmpty() || actions.size > 2 || actions.any { it !in setOf("notifications", "quick_settings", "back", "home") }) {
+    fun runApprovedSequence(label: String, recipeId: String) {
+        val actions = NavigationSequences.steps(recipeId)
+        if (actions == null) {
             recordAction(label, false)
             return
         }
@@ -207,10 +208,10 @@ fun BridgeScreen(onBack: () -> Unit) {
         Text("Готовые сценарии Android", style = MaterialTheme.typography.titleMedium)
         Text("Каждый сценарий запускается только отдельным нажатием и содержит не более двух заранее разрешённых действий.")
         OutlinedButton(enabled = accessibilityEnabled, onClick = {
-            runApprovedSequence("Открыть быстрые настройки", listOf("notifications", "quick_settings"))
+            runApprovedSequence("Открыть быстрые настройки", "open_quick_settings")
         }) { Text("Уведомления → Быстрые настройки") }
         OutlinedButton(enabled = accessibilityEnabled, onClick = {
-            runApprovedSequence("Вернуться на главный экран", listOf("back", "home"))
+            runApprovedSequence("Вернуться на главный экран", "return_home")
         }) { Text("Назад → Домой") }
         Text("Быстрые инструменты", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
