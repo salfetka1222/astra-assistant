@@ -5,7 +5,6 @@ import android.content.ComponentName
 import android.provider.Settings
 import android.content.Intent
 import android.media.AudioManager
-import androidx.compose.material3.AlertDialog
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -66,7 +65,6 @@ fun BridgeScreen(onBack: () -> Unit) {
     var memoryQuery by remember { mutableStateOf("") }
     var result by remember { mutableStateOf("Мост пока не проверен.") }
     var busy by remember { mutableStateOf(false) }
-    var pendingLaunch by remember { mutableStateOf<Pair<String, Intent>?>(null) }
     var actionHistory by remember { mutableStateOf(listOf<String>()) }
     fun recordAction(label: String, success: Boolean) {
         actionHistory = (listOf("${if (success) "✓" else "✕"} $label") + actionHistory).take(12)
@@ -144,23 +142,6 @@ fun BridgeScreen(onBack: () -> Unit) {
         }
     }
 
-    pendingLaunch?.let { (label, intent) ->
-        AlertDialog(
-            onDismissRequest = { pendingLaunch = null },
-            title = { Text("Открыть приложение?") },
-            text = { Text("Astra запустит: $label") },
-            confirmButton = { TextButton(onClick = {
-                pendingLaunch = null
-                val success = try {
-                    context.startActivity(intent)
-                    true
-                } catch (_: Exception) { false }
-                recordAction("Открыть $label", success)
-            }) { Text("Открыть") } },
-            dismissButton = { TextButton(onClick = { pendingLaunch = null }) { Text("Отмена") } }
-        )
-    }
-
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -204,14 +185,20 @@ fun BridgeScreen(onBack: () -> Unit) {
                 recordAction("Громкость −", true)
             }) { Text("Громкость −") }
         }
-        Text("Запуск приложений — только после подтверждения", style = MaterialTheme.typography.titleMedium)
+        Text("Быстрый запуск разрешённых приложений", style = MaterialTheme.typography.titleMedium)
         val launchOptions = listOf(
             "Настройки Android" to Intent(Settings.ACTION_SETTINGS),
             "Настройки Wi-Fi" to Intent(Settings.ACTION_WIFI_SETTINGS),
             "Браузер" to Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.google.com"))
         )
         launchOptions.forEach { (label, intent) ->
-            OutlinedButton(onClick = { pendingLaunch = label to intent }) { Text("Открыть: $label") }
+            OutlinedButton(onClick = {
+                val success = try {
+                    context.startActivity(intent)
+                    true
+                } catch (_: Exception) { false }
+                recordAction("Открыть $label", success)
+            }) { Text("Открыть: $label") }
         }
         if (actionHistory.isNotEmpty()) {
             Text("История действий (только в текущем сеансе)", style = MaterialTheme.typography.titleMedium)
