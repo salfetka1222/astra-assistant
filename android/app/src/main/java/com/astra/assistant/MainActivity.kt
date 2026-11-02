@@ -46,26 +46,26 @@ class MainActivity : ComponentActivity() {
 
             val colors = if (darkTheme) {
                 darkColorScheme(
-                    primary = Color(0xFFB7B5FF),
-                    secondary = Color(0xFFCAC8FF),
-                    background = Color(0xFF12121A),
-                    surface = Color(0xFF1D1D29),
-                    surfaceVariant = Color(0xFF30303D),
-                    onBackground = Color(0xFFF1F0FA),
-                    onSurface = Color(0xFFF1F0FA),
-                    onSurfaceVariant = Color(0xFFD0CEE0),
-                    primaryContainer = Color(0xFF34335F),
-                    onPrimaryContainer = Color(0xFFE5E3FF)
+                    primary = Color(0xFFFFB3B5),
+                    secondary = Color(0xFFE6BDBD),
+                    background = Color(0xFF1B1112),
+                    surface = Color(0xFF261B1D),
+                    surfaceVariant = Color(0xFF493638),
+                    onBackground = Color(0xFFFFEDEC),
+                    onSurface = Color(0xFFFFEDEC),
+                    onSurfaceVariant = Color(0xFFE4C3C4),
+                    primaryContainer = Color(0xFF73363C),
+                    onPrimaryContainer = Color(0xFFFFDADB)
                 )
             } else {
                 lightColorScheme(
-                    primary = Color(0xFF5B5BD6),
-                    secondary = Color(0xFF7676E8),
-                    background = Color(0xFFF7F7FC),
-                    surface = Color.White,
-                    surfaceVariant = Color(0xFFEAEAFF),
-                    onBackground = Color(0xFF191923),
-                    onSurface = Color(0xFF191923),
+                    primary = Color(0xFFB65359),
+                    secondary = Color(0xFF93666A),
+                    background = Color(0xFFFFF8F7),
+                    surface = Color(0xFFFFFBFA),
+                    surfaceVariant = Color(0xFFF3DDDE),
+                    onBackground = Color(0xFF291719),
+                    onSurface = Color(0xFF291719),
                     onSurfaceVariant = Color(0xFF49485A),
                     primaryContainer = Color(0xFFDEDEFF),
                     onPrimaryContainer = Color(0xFF24234A)

@@ -14,6 +14,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +50,7 @@ fun ChatScreen(
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showBridge by rememberSaveable { mutableStateOf(false) }
     var showUpdates by rememberSaveable { mutableStateOf(false) }
+    var selectedTab by rememberSaveable { mutableStateOf(0) }
 
     if (showUpdates) {
         UpdatesScreen(onBack = { showUpdates = false })
@@ -68,80 +72,99 @@ fun ChatScreen(
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Astra Assistant", style = MaterialTheme.typography.headlineSmall)
-                Text(
-                    "Прототип 0.2 • локальный режим",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            TextButton(onClick = { showBridge = true }) {
-                Text("🔗 Termux")
-            }
-            TextButton(onClick = { showSettings = true }) {
-                Text("⚙ Настройки")
-            }
-            TextButton(onClick = viewModel::clearHistory) {
-                Text("Очистить")
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                listOf("Главная", "Чат", "Инструменты").forEachIndexed { index, label ->
+                    NavigationBarItem(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        icon = { Text(listOf("⌂", "✦", "⚙")[index]) },
+                        label = { Text(label) }
+                    )
+                }
             }
         }
-
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 12.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+    ) { insets ->
+        Column(
+            modifier = Modifier.fillMaxSize().padding(insets).padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                "Привет! Я Astra. Сейчас отвечаю в бесплатном демонстрационном режиме, а историю храню на телефоне.",
-                modifier = Modifier.padding(14.dp),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(messages, key = { it.id }) { message ->
-                MessageBubble(message)
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("ASTRA", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                    Text("EVOLUTION • локальный режим", style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                TextButton(onClick = { showSettings = true }) { Text("Настройки") }
             }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Напиши сообщение…") },
-                shape = RoundedCornerShape(20.dp),
-                maxLines = 4
-            )
-            Button(
-                onClick = {
-                    viewModel.send(draft)
-                    draft = ""
-                },
-                enabled = draft.isNotBlank()
-            ) {
-                Text("➤")
+            when (selectedTab) {
+                0 -> {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(28.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Центр управления", style = MaterialTheme.typography.headlineSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text("Astra готова к работе. Инструменты подключаются отдельно; ИИ пока в демонстрационном режиме.",
+                                color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Button(onClick = { selectedTab = 1 }) { Text("Открыть чат") }
+                        }
+                    }
+                    Card(onClick = { showBridge = true }, modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp)) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Text("Termux Bridge", style = MaterialTheme.typography.titleMedium)
+                            Text("Подключение и команды", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Card(onClick = { showSettings = true }, modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp)) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Text("Настройки и обновления", style = MaterialTheme.typography.titleMedium)
+                            Text("Тема, версия и безопасность", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                1 -> {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(messages, key = { it.id }) { message -> MessageBubble(message) }
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(value = draft, onValueChange = { draft = it },
+                            modifier = Modifier.weight(1f), placeholder = { Text("Сообщение Astra…") },
+                            shape = RoundedCornerShape(24.dp), maxLines = 4)
+                        Button(onClick = { viewModel.send(draft); draft = "" },
+                            enabled = draft.isNotBlank()) { Text("➤") }
+                    }
+                    TextButton(onClick = viewModel::clearHistory) { Text("Очистить историю") }
+                }
+                else -> {
+                    Card(onClick = { showBridge = true }, modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp)) {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Text("Termux", style = MaterialTheme.typography.titleLarge)
+                            Text("Открыть существующий мост", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Card(onClick = { showSettings = true }, modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp)) {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Text("Параметры Astra", style = MaterialTheme.typography.titleLarge)
+                            Text("Тема и проверка обновлений", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Text("Shizuku и новые инструменты появятся на следующих этапах.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
@@ -202,8 +225,8 @@ private fun SettingsScreen(
                         Text(
                             when (mode) {
                                 ThemeMode.SYSTEM -> "Следует настройке Android"
-                                ThemeMode.LIGHT -> "Светлый фон и лавандовые акценты"
-                                ThemeMode.DARK -> "Тёмный фон и мягкие фиолетовые акценты"
+                                ThemeMode.LIGHT -> "Светлая тема с мягким красным акцентом"
+                                ThemeMode.DARK -> "Тёмная тема с приглушённым красным акцентом"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -220,7 +243,7 @@ private fun SettingsScreen(
         Text("О приложении", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Astra Assistant 0.2\nСейчас работает локально. Выбор темы сохраняется на устройстве.",
+            "Astra Evolution • предварительный дизайн 1.0\nСейчас работает локально. Выбор темы сохраняется на устройстве.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
