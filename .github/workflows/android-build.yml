@@ -102,7 +102,7 @@ jobs:
       - name: Verify APK version for 1.0 release
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
         run: |
-          grep -Eq 'versionCode = 16([[:space:]]|$)' android/app/build.gradle.kts || exit 1
+          grep -Eq 'versionCode = 17([[:space:]]|$)' android/app/build.gradle.kts || exit 1
           grep -Fq 'versionName = "1.0.0"' android/app/build.gradle.kts || { echo "Release requires final versionName 1.0.0"; exit 1; }
 
       - name: Validate release branch and unused tag
@@ -114,9 +114,9 @@ jobs:
           status=$(curl --silent --show-error --output "$RUNNER_TEMP/astra-tag-response.json" --write-out '%{http_code}' \
             --header "Authorization: Bearer $GH_TOKEN" \
             --header "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/git/ref/tags/astra-v16") || exit 1
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/git/ref/tags/astra-v17") || exit 1
           if [ "$status" = 404 ]; then
-            echo "Tag astra-v16 is available"
+            echo "Tag astra-v17 is available"
           else
             echo "Refusing publication: tag lookup returned HTTP $status"
             exit 1
@@ -127,7 +127,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           target_commitish: ${{ github.sha }}
-          tag_name: astra-v16
+          tag_name: astra-v17
           name: Astra Evolution 1.0.0
           prerelease: false
           draft: false

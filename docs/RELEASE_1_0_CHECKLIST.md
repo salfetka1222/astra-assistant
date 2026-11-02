@@ -1,26 +1,27 @@
-# Astra Evolution 1.0 — release readiness (not yet published)
+# Astra Evolution 1.0.0 — final release checklist
 
-- [x] Debug Android build and Termux bridge tests passed for e071cbc.
-- [x] Set candidate `versionCode=15` and `versionName=1.0.0-rc.3`; switch to `1.0.0` only after device acceptance.
-- [x] Prepare release workflow for `astra-v15` from `feature/astra-1.0`; publishing is blocked until `versionName=1.0.0`.
-- [x] Check versionCode 14 before release; verify tag is unused.
-- [x] Verified v14 signed candidate upgraded the installed app without losing settings or chat history; verify v15 separately.
-- [x] Signed v14 artifact and SHA-256 generated successfully; v15 verification pending.
-- [x] Switch UpdateClient to GitHub Releases latest API, reading asset size and download URLs directly from the published release.
-- [ ] Verify the public GitHub latest release resolves to `astra-v15` only after final publication.
-- [ ] Verify in-app update download, signature check, Android install prompt and persistence after upgrade on a device.
-- [ ] Test onboarding on a clean install with Termux, token connection, permission setup and offline/error states.
-- [x] UI already labels chat as a demo engine, not a connected language model.
-- [ ] Obtain explicit approval before publishing the public release.
+Stable release is **not published**. Public release requires separate explicit user approval.
 
-Do not enable `publish_release` until candidate upgrade and updater flow are tested, and versionName is final. The legacy latest.json is no longer used by new builds; older installed versions may still read it.
+## Confirmed on Android device
 
-## In-app upgrade trial
+- [x] Signed v15 (`1.0.0-rc.3`) installed; settings, chat history, Termux and Android controls retained.
+- [x] Opt-in test channel discovered public GitHub prerelease `astra-v16`.
+- [x] In-app v15 → v16 download, checksum, APK identity verification and Android installation completed without errors.
+- [x] After in-app upgrade, v16 version display, settings/history, Termux connection, Android buttons and update center confirmed.
+- [x] Public v16 is marked prerelease, not stable.
 
-- [x] v15 installed and test-channel switch confirmed on device.
-- [ ] Build signed v16 (`1.0.0-rc.4`) candidate and verify checksum.
-- [ ] Publish **prerelease only** tag `astra-v16` with signed APK and checksum after successful build.
-- [ ] On v15 select Test channel, discover v16, download, verify and install.
-- [ ] Confirm data and bridge survive the in-app upgrade.
+## Final stable candidate
 
-The workflow `publish_release` path is reserved for stable 1.0 and rejects rc version names. Use a separate explicit GitHub prerelease command for the authorized v16 test only.
+- [x] Set `versionCode=17`, `versionName=1.0.0`, and stable tag `astra-v17` (higher than installed v16).
+- [ ] Verify Android unit tests, Termux bridge tests and signed v17 build.
+- [ ] Verify APK version, signing identity and checksum on final artifact.
+- [ ] Test clean-install onboarding and failure/offline states on device.
+- [ ] Verify stable GitHub Releases metadata and update flow after explicitly authorized publication.
+- [ ] Obtain separate explicit user approval for publishing public stable `astra-v17`.
+
+## Notes
+
+- `publish_release=false` is mandatory for candidate builds; workflow checks version and unused tag before stable publication.
+- The test channel currently points to the pinned `astra-v16` prerelease and should be redesigned or hidden before general availability; it does not affect stable checks.
+- Older versions before v15 use the legacy `updates/latest.json` feed and may need manual upgrade or a separately reviewed feed update.
+- Chat currently uses a clearly labeled demo engine; do not market it as an active cloud LLM.
