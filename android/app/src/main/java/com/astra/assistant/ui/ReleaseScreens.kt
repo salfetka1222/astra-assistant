@@ -3,6 +3,8 @@ package com.astra.assistant.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +25,11 @@ fun AboutAstraScreen(onBack: () -> Unit) {
         HorizontalDivider()
         Text("Создатель: ones #manera", style = MaterialTheme.typography.titleLarge)
         Text("Помощник: ChatGPT ♥️", style = MaterialTheme.typography.titleMedium)
+        val context = LocalContext.current
+        Button(onClick = {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/astra_evolution"))
+            runCatching { context.startActivity(intent) }
+        }) { Text("Наш Telegram-канал ↗") }
         Text("Astra — открываемый для пользователей проект Android-инструментов, локального чата и безопасного подключения Termux.")
         Text("Технологии: Kotlin, Jetpack Compose, Material Design 3, Python, Termux Bridge.")
         Text("Приватность: мост работает локально на 127.0.0.1 и требует секретный токен. Разрешения Android включаются пользователем.")
