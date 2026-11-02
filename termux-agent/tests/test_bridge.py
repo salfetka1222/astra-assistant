@@ -46,6 +46,20 @@ class BridgeSafetyTests(unittest.TestCase):
         response.read()
         connection.close()
 
+    def test_browser_origin_is_rejected_even_with_valid_token(self):
+        with patch.object(bridge, "run_tool") as runner:
+            connection = http.client.HTTPConnection(bridge.HOST, self.port, timeout=3)
+            connection.request("POST", "/v1/tool", body=b'{}', headers={
+                "Authorization": "Bearer " + self.token,
+                "Origin": "https://untrusted.example",
+                "Content-Length": "2",
+            })
+            response = connection.getresponse()
+            self.assertEqual(response.status, 403)
+            self.assertEqual(json.loads(response.read())["error"], "origin_not_allowed")
+            connection.close()
+            runner.assert_not_called()
+
     def test_requires_token_for_health(self):
         status, payload = self.request("GET", "/v1/health")
         self.assertEqual(status, 401)

@@ -63,6 +63,11 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
         self.wfile.write(encoded)
         self.close_connection = True
 
+    def _trusted_request(self) -> bool:
+        # The Android app sends no Origin header. Reject browser-originated
+        # requests, even if a future endpoint accidentally relaxes auth.
+        return self.headers.get("Origin") is None and self.headers.get("Sec-Fetch-Site") not in ("cross-site", "same-site")
+
     def _authorized(self) -> bool:
         value = self.headers.get("Authorization", "")
         prefix = "Bearer "
@@ -71,6 +76,9 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
         return hmac.compare_digest(value[len(prefix):], self.server.token)
 
     def do_GET(self) -> None:
+        if not self._trusted_request():
+            self._send_json(403, {"ok": False, "error": "origin_not_allowed"})
+            return
         if not self._authorized():
             self._send_json(401, {"ok": False, "error": "unauthorized"})
             return
@@ -88,6 +96,9 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
         })
 
     def do_POST(self) -> None:
+        if not self._trusted_request():
+            self._send_json(403, {"ok": False, "error": "origin_not_allowed"})
+            return
         if not self._authorized():
             self._send_json(401, {"ok": False, "error": "unauthorized"})
             return
