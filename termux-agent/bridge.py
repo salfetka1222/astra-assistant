@@ -26,7 +26,7 @@ MAX_BODY_BYTES = 8192
 RATE_WINDOW_SECONDS = 10
 RATE_MAX_REQUESTS = 30
 MAX_CONCURRENT_CONNECTIONS = 8
-READ_ONLY_TOOLS = frozenset({"list_files"})
+READ_ONLY_TOOLS = frozenset({"list_files", "workspace_summary"})
 
 
 class AstraBridgeServer(ThreadingHTTPServer):

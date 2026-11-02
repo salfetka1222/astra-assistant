@@ -12,6 +12,21 @@ class AgentSafetyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             agent.safe_path("../outside.txt")
 
+    def test_workspace_summary_counts_python_without_reading_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "main.py").write_text("private data", encoding="utf-8")
+            (root / "notes.txt").write_text("secret", encoding="utf-8")
+            (root / "subfolder").mkdir()
+            with patch.object(agent, "WORKSPACE", root):
+                result = agent.tool_workspace_summary({"path": "."})
+                self.assertEqual(result["python_files"], 1)
+                self.assertEqual(result["files"], 2)
+                self.assertEqual(result["directories"], 1)
+                self.assertNotIn("private data", str(result))
+                with self.assertRaises(ValueError):
+                    agent.tool_workspace_summary({"path": "../"})
+
     def test_write_file_creates_new_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             with patch.object(agent, "WORKSPACE", Path(tmp)):

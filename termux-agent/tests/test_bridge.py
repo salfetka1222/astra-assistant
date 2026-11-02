@@ -113,8 +113,16 @@ class BridgeSafetyTests(unittest.TestCase):
         self.assertEqual(payload["transport"], "loopback")
         self.assertIsInstance(payload["uptime_seconds"], int)
         self.assertGreaterEqual(payload["uptime_seconds"], 0)
-        self.assertEqual(payload["tools"], ["list_files"])
+        self.assertEqual(payload["tools"], ["list_files", "workspace_summary"])
         self.assertNotIn("token", payload)
+
+    def test_workspace_summary_dispatches(self):
+        with patch.object(bridge, "run_tool", return_value={"python_files": 2}) as runner:
+            status, payload = self.request("POST", "/v1/tool",
+                {"tool": "workspace_summary", "arguments": {"path": "."}}, token=self.token)
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["result"]["python_files"], 2)
+        runner.assert_called_once()
 
     def test_write_tool_is_blocked_before_execution(self):
         with patch.object(bridge, "run_tool") as run_tool:

@@ -312,6 +312,17 @@ fun BridgeScreen(onBack: () -> Unit) {
             enabled = !busy && "list_files" in supportedTools
         ) { Text("Показать workspace") }
 
+        OutlinedButton(
+            onClick = {
+                runRequest(
+                    "/v1/tool",
+                    JSONObject().put("tool", "workspace_summary")
+                        .put("arguments", JSONObject().put("path", "."))
+                )
+            },
+            enabled = !busy && "workspace_summary" in supportedTools
+        ) { Text("Анализ Python-файлов workspace") }
+
         Text("Чтение файла workspace", style = MaterialTheme.typography.titleMedium)
         if ("read_file" !in supportedTools) Text("Чтение файлов отключено сервером моста. Доступен только список файлов.")
         OutlinedTextField(

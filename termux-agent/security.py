@@ -138,6 +138,10 @@ TOOL_SPECS: Mapping[str, ToolSpec] = MappingProxyType({
         "list_files", "List names inside the bounded workspace.",
         AccessCategory.READ_ONLY, _ENTRY_SOURCES,
     ),
+    "workspace_summary": ToolSpec(
+        "workspace_summary", "Count Python files and directories in a bounded workspace folder.",
+        AccessCategory.READ_ONLY, _ENTRY_SOURCES,
+    ),
     "read_file": ToolSpec(
         "read_file", "Read potentially private workspace contents.",
         AccessCategory.SENSITIVE_READ, _ENTRY_SOURCES,

@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent
 WORKSPACE = Path(os.environ.get("AGENT_WORKSPACE", str(BASE_DIR / "workspace"))).resolve()
 MAX_READ_BYTES = 20_000
 MEMORY_DB = Path(os.environ.get("AGENT_MEMORY_DB", str(BASE_DIR / "memory.sqlite3"))).resolve()
-ALLOWED_TOOLS = {"device_status", "list_files", "read_file", "write_file", "safe_command", "open_url", "memory_add", "memory_search", "clipboard_get", "clipboard_set", "launch_app"}
+ALLOWED_TOOLS = {"device_status", "list_files", "workspace_summary", "read_file", "write_file", "safe_command", "open_url", "memory_add", "memory_search", "clipboard_get", "clipboard_set", "launch_app"}
 
 
 def _request_json(url: str, payload: dict[str, Any] | None = None, headers: dict[str, str] | None = None, timeout: int = 30) -> Any:
@@ -81,6 +81,29 @@ def tool_list_files(args: dict[str, Any]) -> dict[str, Any]:
     for item in sorted(folder.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))[:100]:
         entries.append({"name": item.name, "type": "directory" if item.is_dir() else "file"})
     return {"path": str(folder.relative_to(WORKSPACE)), "entries": entries}
+
+
+
+def tool_workspace_summary(args: dict[str, Any]) -> dict[str, Any]:
+    """Bounded, metadata-only Python workspace overview; never reads file contents."""
+    folder = safe_path(str(args.get("path", ".")))
+    if not folder.is_dir():
+        raise ValueError("Папка не найдена.")
+    files = 0
+    python_files = 0
+    directories = 0
+    for item in list(folder.iterdir())[:101]:
+        if files + directories >= 100:
+            break
+        if item.is_dir():
+            directories += 1
+        elif item.is_file():
+            files += 1
+            if item.suffix.lower() == ".py":
+                python_files += 1
+    return {"path": str(folder.relative_to(WORKSPACE)), "files": files,
+            "python_files": python_files, "directories": directories,
+            "truncated": files + directories >= 100}
 
 
 def tool_read_file(args: dict[str, Any]) -> dict[str, Any]:
@@ -208,6 +231,7 @@ def tool_launch_app(args: dict[str, Any]) -> dict[str, Any]:
 TOOLS = {
     "device_status": tool_device_status,
     "list_files": tool_list_files,
+    "workspace_summary": tool_workspace_summary,
     "read_file": tool_read_file,
     "write_file": tool_write_file,
     "safe_command": tool_safe_command,
