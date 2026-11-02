@@ -4,6 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
@@ -18,6 +22,7 @@ private const val PREFS_NAME = "astra_preferences"
 private const val THEME_KEY = "theme_mode"
 private const val ACCENT_KEY = "accent_color"
 private const val BUTTON_KEY = "button_size"
+private const val RELEASE_WELCOME_KEY = "release_1_0_welcome_seen"
 
 enum class ThemeMode(val storageValue: String, val title: String) {
     SYSTEM("system", "Как в системе"),
@@ -34,6 +39,7 @@ class MainActivity : ComponentActivity() {
     private var themeMode by mutableStateOf(ThemeMode.SYSTEM)
     private var accent by mutableStateOf("red")
     private var buttonSize by mutableStateOf("normal")
+    private var showReleaseWelcome by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +50,7 @@ class MainActivity : ComponentActivity() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         accent = prefs.getString(ACCENT_KEY, "red") ?: "red"
         buttonSize = prefs.getString(BUTTON_KEY, "normal") ?: "normal"
+        showReleaseWelcome = !prefs.getBoolean(RELEASE_WELCOME_KEY, false)
         setContent {
             val darkTheme = when (themeMode) {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -144,8 +151,27 @@ class MainActivity : ComponentActivity() {
                                 .apply()
                         }
                     )
+                    if (showReleaseWelcome) {
+                        AlertDialog(
+                            onDismissRequest = { dismissReleaseWelcome(prefs) },
+                            title = { Text("🚀 Astra Evolution 1.0 — релиз состоялся!") },
+                            text = { Text("Добро пожаловать в первый стабильный выпуск Astra Evolution! Спасибо, что участвовал в тестировании и помогал сделать приложение лучше. Впереди ещё больше возможностей!") },
+                            confirmButton = {
+                                Button(onClick = { dismissReleaseWelcome(prefs) }) {
+                                    Text("Начать пользоваться Astra")
+                                }
+                            }
+                        )
+                    }
                 }
             }
+        }
+    }
+
+    private fun dismissReleaseWelcome(prefs: android.content.SharedPreferences) {
+        // Commit synchronously so the dialog never reappears after a quick app restart.
+        if (prefs.edit().putBoolean(RELEASE_WELCOME_KEY, true).commit()) {
+            showReleaseWelcome = false
         }
     }
 }
