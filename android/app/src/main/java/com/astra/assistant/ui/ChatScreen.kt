@@ -339,7 +339,7 @@ private fun SettingsScreen(
         Text("О приложении", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Astra Evolution • Beta 3\nЛокальный режим. Настройки темы сохраняются на устройстве. Расширенная персонализация и сведения о создателях появятся в релизе 1.0.",
+            "Astra Evolution • 1.1\nНастройки оформления и история сохраняются на устройстве. Сведения о приложении и обновлениях доступны в разделах выше.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
