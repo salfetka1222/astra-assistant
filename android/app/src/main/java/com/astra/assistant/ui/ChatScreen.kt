@@ -1,5 +1,10 @@
 package com.astra.assistant.ui
 
+import android.content.Context
+import android.app.ActivityManager
+import android.os.BatteryManager
+import android.os.Environment
+import android.os.StatFs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -31,9 +36,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -55,6 +62,8 @@ fun ChatScreen(
     var showBridge by rememberSaveable { mutableStateOf(false) }
     var showUpdates by rememberSaveable { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableStateOf(0) }
+    val context = LocalContext.current
+    var deviceSummary by remember { mutableStateOf("Нажми «Обновить состояние», чтобы получить показатели.") }
 
     if (showUpdates) {
         UpdatesScreen(onBack = { showUpdates = false })
@@ -123,6 +132,31 @@ fun ChatScreen(
                             Text("Astra готова к работе. Инструменты подключаются отдельно; ИИ пока в демонстрационном режиме.",
                                 color = MaterialTheme.colorScheme.onPrimaryContainer)
                             Button(onClick = { selectedTab = 1 }) { Text("Открыть чат") }
+                        }
+                    }
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Состояние телефона", style = MaterialTheme.typography.titleLarge)
+                            Text(deviceSummary, style = MaterialTheme.typography.bodyMedium)
+                            Button(onClick = {
+                                deviceSummary = try {
+                                    val battery = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+                                    val percent = battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                                    val batteryLabel = if (percent in 0..100) "$percent%" else "недоступно"
+                                    val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                                    val info = ActivityManager.MemoryInfo()
+                                    manager.getMemoryInfo(info)
+                                    val storage = StatFs(Environment.getDataDirectory().absolutePath)
+                                    val mib = 1024L * 1024L
+                                    "Батарея: $batteryLabel\nСвободная ОЗУ: ${info.availMem / mib} МиБ\nСвободное место: ${storage.availableBytes / mib} МиБ"
+                                } catch (_: Exception) {
+                                    "Не удалось получить показатели устройства."
+                                }
+                            }) { Text("Обновить состояние") }
                         }
                     }
                     Card(onClick = { showBridge = true }, modifier = Modifier.fillMaxWidth(),
