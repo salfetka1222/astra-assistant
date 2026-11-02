@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
         accent = prefs.getString(ACCENT_KEY, "red") ?: "red"
         buttonSize = prefs.getString(BUTTON_KEY, "normal") ?: "normal"
         showReleaseWelcome = !prefs.getBoolean(RELEASE_WELCOME_KEY, false)
-        showWhatsNew = prefs.getString(LAST_CHANGELOG_KEY, null) != WhatsNewCatalog.current.id
+        showWhatsNew = WhatsNewCatalog.shouldShow(prefs.getString(LAST_CHANGELOG_KEY, null), WhatsNewCatalog.current.id)
         setContent {
             val darkTheme = when (themeMode) {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()

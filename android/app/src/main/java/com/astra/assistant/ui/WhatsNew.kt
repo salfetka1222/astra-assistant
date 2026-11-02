@@ -17,6 +17,8 @@ internal data class ChangeLog(val id: String, val version: String, val changes: 
 
 // Bundled with the APK: no network access needed, and no unverified server text is rendered.
 internal object WhatsNewCatalog {
+    fun shouldShow(lastSeenId: String?, currentId: String): Boolean = lastSeenId != currentId
+
     val current = ChangeLog(
         id = "1.1.0",
         version = "1.1.0",
