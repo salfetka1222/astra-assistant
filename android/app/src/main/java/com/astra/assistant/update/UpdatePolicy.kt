@@ -22,7 +22,7 @@ internal object UpdatePolicy {
         val uri = URI(url)
         uri.scheme == "https" && uri.userInfo == null &&
             (uri.port == -1 || uri.port == 443) &&
-            uri.host in setOf("api.github.com", "github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com")
+            uri.host in setOf("api.github.com", "raw.githubusercontent.com", "github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com")
     }.getOrDefault(false)
 
     fun checksum(text: String): String =

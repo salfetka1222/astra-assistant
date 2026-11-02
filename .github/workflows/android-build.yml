@@ -108,9 +108,9 @@ jobs:
           status=$(curl --silent --show-error --output "$RUNNER_TEMP/astra-tag-response.json" --write-out '%{http_code}' \
             --header "Authorization: Bearer $GH_TOKEN" \
             --header "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/git/ref/tags/astra-v8") || exit 1
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/git/ref/tags/astra-v9") || exit 1
           if [ "$status" = 404 ]; then
-            echo "Tag astra-v8 is available"
+            echo "Tag astra-v9 is available"
           else
             echo "Refusing publication: tag lookup returned HTTP $status"
             exit 1
@@ -121,8 +121,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           target_commitish: ${{ github.sha }}
-          tag_name: astra-v8
-          name: Astra 0.8.0
+          tag_name: astra-v9
+          name: Astra 0.9.0
           prerelease: false
           draft: false
           files: |

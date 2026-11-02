@@ -23,7 +23,7 @@ internal data class ReadyUpdate(val release: AstraRelease, val file: File, val s
 
 internal class UpdateClient(private val context: Context) {
     companion object {
-        private const val API = "https://api.github.com/repos/salfetka1222/astra-assistant/releases/latest"
+        private const val API = "https://raw.githubusercontent.com/salfetka1222/astra-assistant/feature/in-app-updates/updates/latest.json"
     }
 
     @Suppress("DEPRECATION")
@@ -82,20 +82,11 @@ internal class UpdateClient(private val context: Context) {
         val version = UpdatePolicy.version(tag)
         val installed = code(context.packageManager.getPackageInfo(context.packageName, 0))
         if (version <= installed) return null
-        val assets = json.getJSONArray("assets")
-        fun asset(name: String): JSONObject {
-            val matches = (0 until assets.length()).map { assets.getJSONObject(it) }
-                .filter { it.optString("name") == name && it.optString("state") == "uploaded" }
-            require(matches.size == 1) { "В релизе отсутствует файл $name." }
-            return matches.single()
-        }
-        val apk = asset("app-release.apk")
-        val sum = asset("app-release.apk.sha256")
-        val size = apk.getLong("size")
+        val size = json.getLong("apk_size")
         require(size in 1..UpdatePolicy.MAX_APK_BYTES) { "Недопустимый размер APK." }
         return AstraRelease(version,
-            UpdatePolicy.assetUrl(apk.getString("browser_download_url"), tag, "app-release.apk"),
-            UpdatePolicy.assetUrl(sum.getString("browser_download_url"), tag, "app-release.apk.sha256"),
+            UpdatePolicy.assetUrl(json.getString("apk_url"), tag, "app-release.apk"),
+            UpdatePolicy.assetUrl(json.getString("checksum_url"), tag, "app-release.apk.sha256"),
             size)
     }
 
