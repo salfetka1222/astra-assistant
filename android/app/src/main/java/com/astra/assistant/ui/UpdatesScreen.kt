@@ -51,7 +51,7 @@ fun UpdatesScreen(onBack: () -> Unit) {
                 release = null
                 status = "Проверяем обновления…"
                 release = withContext(Dispatchers.IO) { client.latest() }
-                status = if (release == null) "Установлена актуальная стабильная версия."
+                status = if (release == null) "Новых обновлений в настроенном канале пока нет."
                     else "Найдено обновление (код ${release!!.code}). Нажми «Скачать обновление», чтобы проверить APK."
             }
         }) { Text("Проверить обновления") }

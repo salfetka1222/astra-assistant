@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.core.content.pm.PackageInfoCompat
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -17,11 +18,13 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun AboutAstraScreen(onBack: () -> Unit) {
     var taps by remember { mutableIntStateOf(0) }
+    val context = LocalContext.current
+    val appInfo = remember(context) { context.packageManager.getPackageInfo(context.packageName, 0) }
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         TextButton(onClick = onBack) { Text("← Назад") }
         TextButton(onClick = { taps++ }) { Text("✦ ASTRA EVOLUTION", style = MaterialTheme.typography.headlineMedium) }
-        Text("Версия 1.0 • Android Assistant")
+        Text("Версия ${appInfo.versionName} (код ${PackageInfoCompat.getLongVersionCode(appInfo)}) • Android Assistant")
         HorizontalDivider()
         Text("Создатель: ones #manera", style = MaterialTheme.typography.titleLarge)
         Text("Помощник: ChatGPT ♥️", style = MaterialTheme.typography.titleMedium)
