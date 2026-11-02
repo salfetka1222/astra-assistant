@@ -14,3 +14,13 @@
 - [ ] Obtain explicit approval before publishing the public release.
 
 Do not enable `publish_release` until candidate upgrade and updater flow are tested, and versionName is final. The legacy latest.json is no longer used by new builds; older installed versions may still read it.
+
+## In-app upgrade trial
+
+- [x] v15 installed and test-channel switch confirmed on device.
+- [ ] Build signed v16 (`1.0.0-rc.4`) candidate and verify checksum.
+- [ ] Publish **prerelease only** tag `astra-v16` with signed APK and checksum after successful build.
+- [ ] On v15 select Test channel, discover v16, download, verify and install.
+- [ ] Confirm data and bridge survive the in-app upgrade.
+
+The workflow `publish_release` path is reserved for stable 1.0 and rejects rc version names. Use a separate explicit GitHub prerelease command for the authorized v16 test only.
