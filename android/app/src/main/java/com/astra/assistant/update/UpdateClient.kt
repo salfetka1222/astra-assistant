@@ -24,6 +24,7 @@ internal data class ReadyUpdate(val release: AstraRelease, val file: File, val s
 internal class UpdateClient(private val context: Context) {
     companion object {
         private const val API = "https://api.github.com/repos/salfetka1222/astra-assistant/releases/latest"
+        private const val TEST_API = "https://api.github.com/repos/salfetka1222/astra-assistant/releases/tags/astra-v16"
     }
 
     @Suppress("DEPRECATION")
@@ -74,10 +75,13 @@ internal class UpdateClient(private val context: Context) {
         } finally { c.disconnect() }
     }
 
-    suspend fun latest(): AstraRelease? {
-        val text = readText(API, 1024 * 1024, true) ?: return null
+    suspend fun latest(testChannel: Boolean = false): AstraRelease? {
+        val text = readText(if (testChannel) TEST_API else API, 1024 * 1024, true) ?: return null
         val json = JSONObject(text)
-        require(!json.optBoolean("draft") && !json.optBoolean("prerelease")) { "Релиз ещё не готов." }
+        require(!json.optBoolean("draft") && (testChannel || !json.optBoolean("prerelease"))) { "Релиз ещё не готов." }
+        if (testChannel) require(json.optBoolean("prerelease") && json.getString("tag_name") == "astra-v16") {
+            "Неверный тестовый релиз."
+        }
         val tag = json.getString("tag_name")
         val version = UpdatePolicy.version(tag)
         val installed = code(context.packageManager.getPackageInfo(context.packageName, 0))

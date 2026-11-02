@@ -24,6 +24,7 @@ fun UpdatesScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val info = remember { context.packageManager.getPackageInfo(context.packageName, 0) }
     var busy by remember { mutableStateOf(false) }
+    var testChannel by remember { mutableStateOf(false) }
     var release by remember { mutableStateOf<AstraRelease?>(null) }
     var ready by remember { mutableStateOf<ReadyUpdate?>(null) }
     var status by remember { mutableStateOf("Проверь, доступна ли новая версия Astra.") }
@@ -44,13 +45,25 @@ fun UpdatesScreen(onBack: () -> Unit) {
         Text("Обновления Astra", style = MaterialTheme.typography.headlineSmall)
         Text("Версия ${info.versionName} (код ${PackageInfoCompat.getLongVersionCode(info)})")
         Text("Astra проверит файл перед установкой. Установку подтверждаешь ты в окне Android.")
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Switch(checked = testChannel, enabled = !busy, onCheckedChange = {
+                ready?.file?.delete()
+                ready = null
+                release = null
+                testChannel = it
+                status = if (it) "Тестовый канал: экспериментальные сборки. Проверка только по твоему запросу."
+                    else "Стабильный канал обновлений."
+            })
+            Spacer(Modifier.width(10.dp))
+            Text(if (testChannel) "Тестовый канал" else "Стабильный канал")
+        }
         Button(enabled = !busy, onClick = {
             task {
                 ready?.file?.delete()
                 ready = null
                 release = null
                 status = "Проверяем обновления…"
-                release = withContext(Dispatchers.IO) { client.latest() }
+                release = withContext(Dispatchers.IO) { client.latest(testChannel) }
                 status = if (release == null) "Новых обновлений в настроенном канале пока нет."
                     else "Найдено обновление (код ${release!!.code}). Нажми «Скачать обновление», чтобы проверить APK."
             }
