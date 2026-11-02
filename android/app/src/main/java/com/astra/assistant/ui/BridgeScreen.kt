@@ -5,6 +5,10 @@ import android.content.ComponentName
 import android.provider.Settings
 import android.content.Intent
 import android.media.AudioManager
+import android.app.ActivityManager
+import android.os.BatteryManager
+import android.os.Environment
+import android.os.StatFs
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -185,10 +189,33 @@ fun BridgeScreen(onBack: () -> Unit) {
                 recordAction("Громкость −", true)
             }) { Text("Громкость −") }
         }
+        Text("Диагностика устройства", style = MaterialTheme.typography.titleMedium)
+        OutlinedButton(onClick = {
+            try {
+                val battery = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+                val percent = battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                val batteryText = if (percent in 0..100) "$percent%" else "неизвестно"
+                val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                val memory = ActivityManager.MemoryInfo()
+                manager.getMemoryInfo(memory)
+                val mib = 1024L * 1024L
+                val storage = StatFs(Environment.getDataDirectory().absolutePath)
+                result = "Батарея: $batteryText\n" +
+                    "Свободная ОЗУ: ${memory.availMem / mib} МиБ\n" +
+                    "Свободное хранилище: ${storage.availableBytes / mib} МиБ"
+                actionHistory = (listOf("✓ Диагностика устройства") + actionHistory).take(12)
+            } catch (error: Exception) {
+                Log.w("AstraBridge", "Device diagnostics failed: ${error.javaClass.simpleName}")
+                recordAction("Диагностика устройства", false)
+            }
+        }) { Text("Батарея, ОЗУ и память") }
         Text("Быстрый запуск разрешённых приложений", style = MaterialTheme.typography.titleMedium)
         val launchOptions = listOf(
             "Настройки Android" to Intent(Settings.ACTION_SETTINGS),
             "Настройки Wi-Fi" to Intent(Settings.ACTION_WIFI_SETTINGS),
+            "Экран и яркость" to Intent(Settings.ACTION_DISPLAY_SETTINGS),
+            "Настройки звука" to Intent(Settings.ACTION_SOUND_SETTINGS),
+            "Приложения" to Intent(Settings.ACTION_APPLICATION_SETTINGS),
             "Браузер" to Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.google.com"))
         )
         launchOptions.forEach { (label, intent) ->
