@@ -92,9 +92,9 @@ def tool_workspace_summary(args: dict[str, Any]) -> dict[str, Any]:
     files = 0
     python_files = 0
     directories = 0
-    for item in list(folder.iterdir())[:101]:
-        if files + directories >= 100:
-            break
+    items = sorted(folder.iterdir(), key=lambda item: item.name.lower())
+    truncated = len(items) > 100
+    for item in items[:100]:
         if item.is_dir():
             directories += 1
         elif item.is_file():
@@ -103,7 +103,7 @@ def tool_workspace_summary(args: dict[str, Any]) -> dict[str, Any]:
                 python_files += 1
     return {"path": str(folder.relative_to(WORKSPACE)), "files": files,
             "python_files": python_files, "directories": directories,
-            "truncated": files + directories >= 100}
+            "truncated": truncated}
 
 
 def tool_read_file(args: dict[str, Any]) -> dict[str, Any]:

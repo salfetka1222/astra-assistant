@@ -27,6 +27,20 @@ class AgentSafetyTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     agent.tool_workspace_summary({"path": "../"})
 
+    def test_workspace_summary_boundary_limit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.object(agent, "WORKSPACE", root):
+                for number in range(100):
+                    (root / f"file_{number:03}.py").touch()
+                exact = agent.tool_workspace_summary({"path": "."})
+                self.assertEqual(exact["python_files"], 100)
+                self.assertFalse(exact["truncated"])
+                (root / "file_100.py").touch()
+                over = agent.tool_workspace_summary({"path": "."})
+                self.assertEqual(over["python_files"], 100)
+                self.assertTrue(over["truncated"])
+
     def test_write_file_creates_new_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             with patch.object(agent, "WORKSPACE", Path(tmp)):
