@@ -10,6 +10,7 @@ import hmac
 import json
 import os
 import secrets
+import socket
 import threading
 from collections import deque
 import time
@@ -143,6 +144,9 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
             return
         try:
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
+        except socket.timeout:
+            self._send_json(408, {"ok": False, "error": "request_timeout"})
+            return
         except (UnicodeDecodeError, json.JSONDecodeError):
             self._send_json(400, {"ok": False, "error": "invalid_json"})
             return
@@ -163,6 +167,10 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
             result = run_tool(name, arguments, context=context)
         except (ValueError, RuntimeError):
             self._send_json(403, {"ok": False, "error": "tool_rejected"})
+            return
+        except Exception:
+            # Never leak exception details or secrets to HTTP clients.
+            self._send_json(500, {"ok": False, "error": "internal_error"})
             return
         self._send_json(200, {"ok": True, "tool": name, "result": result})
 

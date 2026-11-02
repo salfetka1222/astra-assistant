@@ -140,6 +140,14 @@ class BridgeSafetyTests(unittest.TestCase):
             self.assertEqual(payload["error"], "arguments_must_be_object")
             runner.assert_not_called()
 
+    def test_unexpected_tool_exception_is_sanitized(self):
+        with patch.object(bridge, "run_tool", side_effect=OSError("SECRET_INTERNAL_PATH")):
+            status, payload = self.request("POST", "/v1/tool",
+                {"tool": "list_files", "arguments": {}}, token=self.token)
+            self.assertEqual(status, 500)
+            self.assertEqual(payload["error"], "internal_error")
+            self.assertNotIn("SECRET_INTERNAL_PATH", json.dumps(payload))
+
     def test_executor_failure_has_generic_error(self):
         with patch.object(bridge, "run_tool", side_effect=ValueError("PRIVATE_SECRET")):
             status, payload = self.request("POST", "/v1/tool",
