@@ -46,6 +46,20 @@ class BridgeSafetyTests(unittest.TestCase):
         response.read()
         connection.close()
 
+    def test_disconnected_client_does_not_raise_or_log_response(self):
+        from unittest.mock import Mock
+        handler = object.__new__(bridge.AstraBridgeHandler)
+        handler.send_response = Mock()
+        handler.send_header = Mock()
+        handler.end_headers = Mock()
+        handler.wfile = Mock()
+        for error in (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            with self.subTest(error=error.__name__):
+                handler.close_connection = False
+                handler.wfile.write.side_effect = error("client disconnected")
+                handler._send_json(401, {"ok": False, "error": "unauthorized"})
+                self.assertTrue(handler.close_connection)
+
     def test_browser_origin_is_rejected_even_with_valid_token(self):
         with patch.object(bridge, "run_tool") as runner:
             connection = http.client.HTTPConnection(bridge.HOST, self.port, timeout=3)
