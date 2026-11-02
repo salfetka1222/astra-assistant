@@ -103,7 +103,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
         run: |
           grep -Eq 'versionCode = 19([[:space:]]|$)' android/app/build.gradle.kts || exit 1
-          grep -Fq 'versionName = "1.0.0"' android/app/build.gradle.kts || { echo "Release requires final versionName 1.1.0"; exit 1; }
+          grep -Fq 'versionName = "1.1.0"' android/app/build.gradle.kts || { echo "Release requires final versionName 1.1.0"; exit 1; }
 
       - name: Validate release branch and unused tag
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
