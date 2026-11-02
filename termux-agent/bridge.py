@@ -10,6 +10,8 @@ import hmac
 import json
 import os
 import secrets
+import threading
+from collections import deque
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -20,6 +22,8 @@ from security import Invocation, RequestSource, create_request_context
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 MAX_BODY_BYTES = 8192
+RATE_WINDOW_SECONDS = 10
+RATE_MAX_REQUESTS = 30
 READ_ONLY_TOOLS = frozenset({"list_files"})
 
 
@@ -34,7 +38,19 @@ class AstraBridgeServer(ThreadingHTTPServer):
             raise ValueError("Bridge token must be at least 32 characters.")
         self.token = token
         self.started_at = time.monotonic()
+        self._rate_lock = threading.Lock()
+        self._recent_requests = deque()
         super().__init__(server_address, AstraBridgeHandler)
+
+    def allow_request(self) -> bool:
+        now = time.monotonic()
+        with self._rate_lock:
+            while self._recent_requests and now - self._recent_requests[0] >= RATE_WINDOW_SECONDS:
+                self._recent_requests.popleft()
+            if len(self._recent_requests) >= RATE_MAX_REQUESTS:
+                return False
+            self._recent_requests.append(now)
+            return True
 
 
 class AstraBridgeHandler(BaseHTTPRequestHandler):
@@ -75,7 +91,15 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
             return False
         return hmac.compare_digest(value[len(prefix):], self.server.token)
 
+    def _within_rate_limit(self) -> bool:
+        if self.server.allow_request():
+            return True
+        self._send_json(429, {"ok": False, "error": "rate_limited"})
+        return False
+
     def do_GET(self) -> None:
+        if not self._within_rate_limit():
+            return
         if not self._trusted_request():
             self._send_json(403, {"ok": False, "error": "origin_not_allowed"})
             return
@@ -96,6 +120,8 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
         })
 
     def do_POST(self) -> None:
+        if not self._within_rate_limit():
+            return
         if not self._trusted_request():
             self._send_json(403, {"ok": False, "error": "origin_not_allowed"})
             return

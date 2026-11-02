@@ -60,6 +60,17 @@ class BridgeSafetyTests(unittest.TestCase):
             connection.close()
             runner.assert_not_called()
 
+    def test_rate_limit_returns_429_and_recovers(self):
+        with patch.object(bridge, "RATE_MAX_REQUESTS", 2):
+            self.assertEqual(self.request("GET", "/v1/health", token=self.token)[0], 200)
+            self.assertEqual(self.request("GET", "/v1/health", token=self.token)[0], 200)
+            status, payload = self.request("GET", "/v1/health", token=self.token)
+            self.assertEqual(status, 429)
+            self.assertEqual(payload["error"], "rate_limited")
+            with self.server._rate_lock:
+                self.server._recent_requests.clear()
+            self.assertEqual(self.request("GET", "/v1/health", token=self.token)[0], 200)
+
     def test_requires_token_for_health(self):
         status, payload = self.request("GET", "/v1/health")
         self.assertEqual(status, 401)
