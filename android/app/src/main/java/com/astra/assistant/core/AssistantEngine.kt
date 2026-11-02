@@ -5,6 +5,8 @@ class AssistantEngine {
         val text = message.trim()
         if (text.isBlank()) return "Напиши сообщение — я на связи."
 
+        CommandInterpreter.interpret(text)?.let { return it }
+
         return when {
             text.contains("привет", ignoreCase = true) ->
                 "Привет! Я Astra Assistant 👋 Пока я работаю в демонстрационном режиме. Следующим этапом подключим настоящую ИИ-модель."

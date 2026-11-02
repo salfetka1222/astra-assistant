@@ -71,9 +71,13 @@ fun BridgeScreen(onBack: () -> Unit) {
     var memoryQuery by remember { mutableStateOf("") }
     var result by remember { mutableStateOf("Мост пока не проверен.") }
     var busy by remember { mutableStateOf(false) }
-    var actionHistory by remember { mutableStateOf(listOf<String>()) }
+    val historyPrefs = remember(context) { context.getSharedPreferences("astra_action_history", Context.MODE_PRIVATE) }
+    fun readHistory(): List<String> = historyPrefs.getString("entries", "").orEmpty()
+        .lines().filter { it.isNotBlank() }.take(30)
+    var actionHistory by remember { mutableStateOf(readHistory()) }
     fun recordAction(label: String, success: Boolean) {
-        actionHistory = (listOf("${if (success) "✓" else "✕"} $label") + actionHistory).take(12)
+        actionHistory = (listOf("${if (success) "✓" else "✕"} $label") + actionHistory).take(30)
+        historyPrefs.edit().putString("entries", actionHistory.joinToString("\n")).apply()
         result = if (success) "Команда «$label» отправлена Android." else "Не удалось выполнить «$label»."
     }
 
@@ -205,7 +209,10 @@ fun BridgeScreen(onBack: () -> Unit) {
                 result = "Батарея: $batteryText\n" +
                     "Свободная ОЗУ: ${memory.availMem / mib} МиБ\n" +
                     "Свободное хранилище: ${storage.availableBytes / mib} МиБ"
-                actionHistory = (listOf("✓ Диагностика устройства") + actionHistory).take(12)
+                recordAction("Диагностика устройства", true)
+                result = "Батарея: $batteryText\n" +
+                    "Свободная ОЗУ: ${memory.availMem / mib} МиБ\n" +
+                    "Свободное хранилище: ${storage.availableBytes / mib} МиБ"
             } catch (error: Exception) {
                 Log.w("AstraBridge", "Device diagnostics failed: ${error.javaClass.simpleName}")
                 recordAction("Диагностика устройства", false)
@@ -230,9 +237,12 @@ fun BridgeScreen(onBack: () -> Unit) {
             }) { Text("Открыть: $label") }
         }
         if (actionHistory.isNotEmpty()) {
-            Text("История действий (только в текущем сеансе)", style = MaterialTheme.typography.titleMedium)
+            Text("История действий (на устройстве)", style = MaterialTheme.typography.titleMedium)
             actionHistory.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
-            TextButton(onClick = { actionHistory = emptyList() }) { Text("Очистить историю") }
+            TextButton(onClick = {
+                actionHistory = emptyList()
+                historyPrefs.edit().remove("entries").apply()
+            }) { Text("Очистить историю") }
         }
         Text("Специальные возможности Android", style = MaterialTheme.typography.titleMedium)
         Text(if (accessibilityEnabled) "Astra Accessibility: включена" else "Astra Accessibility: выключена")
