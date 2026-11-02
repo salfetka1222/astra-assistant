@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.platform.LocalContext
 import com.astra.assistant.AstraAccessibilityService
 import androidx.compose.ui.unit.dp
@@ -255,6 +256,7 @@ fun BridgeScreen(onBack: () -> Unit) {
             onValueChange = { token = it },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Токен из Termux") },
+            visualTransformation = PasswordVisualTransformation(),
             placeholder = { Text("Вставь токен после запуска bridge.py") },
             singleLine = true
         )

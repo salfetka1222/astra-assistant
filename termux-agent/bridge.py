@@ -41,6 +41,11 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
     server: AstraBridgeServer
     protocol_version = "HTTP/1.1"
 
+    def setup(self) -> None:
+        super().setup()
+        # Bound stalled clients so they cannot hold server threads indefinitely.
+        self.connection.settimeout(8)
+
     def log_message(self, format: str, *args: Any) -> None:
         # Do not log request bodies, tokens, paths or tool output.
         return
@@ -51,6 +56,8 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
         self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
         self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(encoded)

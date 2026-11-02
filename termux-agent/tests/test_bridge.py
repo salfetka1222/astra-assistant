@@ -36,6 +36,16 @@ class BridgeSafetyTests(unittest.TestCase):
         connection.close()
         return result
 
+    def test_http_response_has_security_headers(self):
+        connection = http.client.HTTPConnection(bridge.HOST, self.port, timeout=3)
+        connection.request("GET", "/v1/health", headers={"Authorization": "Bearer " + self.token})
+        response = connection.getresponse()
+        self.assertEqual(response.getheader("Cache-Control"), "no-store")
+        self.assertEqual(response.getheader("X-Content-Type-Options"), "nosniff")
+        self.assertEqual(response.getheader("X-Frame-Options"), "DENY")
+        response.read()
+        connection.close()
+
     def test_requires_token_for_health(self):
         status, payload = self.request("GET", "/v1/health")
         self.assertEqual(status, 401)
