@@ -96,9 +96,14 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(encoded)
         self.close_connection = True
+        try:
+            self.end_headers()
+            self.wfile.write(encoded)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, socket.timeout):
+            # A client may disconnect before reading its response. This is not
+            # a server error and must not expose request details in a traceback.
+            return
 
     def _trusted_request(self) -> bool:
         # The Android app sends no Origin header. Reject browser-originated

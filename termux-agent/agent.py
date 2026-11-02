@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sqlite3
+from contextlib import closing
 import sys
 import time
 import urllib.error
@@ -175,7 +176,7 @@ def tool_memory_add(args: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Укажи непустой текст в content.")
     if len(content) > 2000:
         raise ValueError("Одна запись памяти не может превышать 2000 символов.")
-    with _memory_connection() as db:
+    with closing(_memory_connection()) as db, db:
         cursor = db.execute("INSERT INTO memories(content) VALUES (?)", (content.strip(),))
         memory_id = cursor.lastrowid
     return {"ok": True, "id": memory_id, "saved": content.strip()}
@@ -183,7 +184,7 @@ def tool_memory_add(args: dict[str, Any]) -> dict[str, Any]:
 
 def tool_memory_search(args: dict[str, Any]) -> dict[str, Any]:
     query = str(args.get("query", "")).strip()
-    with _memory_connection() as db:
+    with closing(_memory_connection()) as db, db:
         if query:
             rows = db.execute("SELECT id, created_at, content FROM memories WHERE content LIKE ? ORDER BY id DESC LIMIT 20", ("%" + query[:200] + "%",)).fetchall()
         else:
