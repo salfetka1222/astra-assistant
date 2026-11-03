@@ -73,6 +73,8 @@ fun BridgeScreen(onBack: () -> Unit) {
     var result by remember { mutableStateOf("Мост пока не проверен.") }
     var busy by remember { mutableStateOf(false) }
     var supportedTools by remember { mutableStateOf(setOf<String>()) }
+    var bridgeStatus by remember { mutableStateOf("Не проверен") }
+    var lastBridgeCheck by remember { mutableStateOf("") }
     val historyPrefs = remember(context) { context.getSharedPreferences("astra_action_history", Context.MODE_PRIVATE) }
     fun readHistory(): List<String> = historyPrefs.getString("entries", "").orEmpty()
         .lines().filter { it.isNotBlank() }.take(30)
@@ -127,6 +129,7 @@ fun BridgeScreen(onBack: () -> Unit) {
             return
         }
         busy = true
+        if (path == "/v1/health") bridgeStatus = "Проверка…"
         prefs.edit().putString(BRIDGE_TOKEN_KEY, token.trim()).apply()
         scope.launch {
             val response = withContext(Dispatchers.IO) {
@@ -170,6 +173,10 @@ fun BridgeScreen(onBack: () -> Unit) {
                 }
             }
             result = response.first
+            if (path == "/v1/health") {
+                bridgeStatus = if (response.first.startsWith("Astra Bridge: online")) "Подключён" else "Нет подключения"
+                lastBridgeCheck = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date())
+            }
             if (path == "/v1/health" || response.second.isNotEmpty()) supportedTools = response.second
             busy = false
         }
@@ -182,6 +189,25 @@ fun BridgeScreen(onBack: () -> Unit) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
             TextButton(onClick = onBack) { Text("← Назад") }
             Text("Мост Termux", style = MaterialTheme.typography.headlineSmall)
+        }
+        Text("Центр диагностики Astra", style = MaterialTheme.typography.titleMedium)
+        Text("AccessibilityService: " + if (accessibilityEnabled) "Включена" else "Выключена")
+        Text("Termux Bridge: $bridgeStatus")
+        Text("Адрес: 127.0.0.1:8765 (только этот телефон)")
+        Text("Доступных инструментов: ${supportedTools.size}")
+        if (supportedTools.isNotEmpty()) {
+            Text(supportedTools.sorted().joinToString(", "), style = MaterialTheme.typography.bodySmall)
+        }
+        if (lastBridgeCheck.isNotBlank()) Text("Последняя проверка: $lastBridgeCheck")
+        if (!accessibilityEnabled) Text("Для управления Android включи службу Astra в специальных возможностях.")
+        if (bridgeStatus == "Нет подключения") Text("Проверь запуск bridge.py и токен Termux.")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { refreshAccessibility(); runRequest("/v1/health") }, enabled = !busy) {
+                Text("Проверить всё")
+            }
+            OutlinedButton(onClick = {
+                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }) { Text("Accessibility") }
         }
         Text("Управление Android", style = MaterialTheme.typography.titleMedium)
         Text("Действия выполняются только по нажатию кнопки. Astra не читает текст других приложений.")
@@ -291,7 +317,7 @@ fun BridgeScreen(onBack: () -> Unit) {
         )
         OutlinedTextField(
             value = token,
-            onValueChange = { token = it; supportedTools = emptySet() },
+            onValueChange = { token = it; supportedTools = emptySet(); bridgeStatus = "Не проверен" },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Токен из Termux") },
             visualTransformation = PasswordVisualTransformation(),
