@@ -10,8 +10,16 @@ class CommandInterpreterTest {
         assertTrue(CommandInterpreter.interpret("что нового")!!.contains("Настройки"))
     }
 
+    @Test fun diagnosticsAndConnectionHintsAreAvailable() {
+        assertTrue(CommandInterpreter.interpret("Покажи состояние телефона")!!.contains("ОЗУ"))
+        assertTrue(CommandInterpreter.interpret("проверь подключение")!!.contains("Проверить всё"))
+        assertTrue(CommandInterpreter.interpret("специальные возможности")!!.contains("Accessibility"))
+    }
+
     @Test fun unknownAndPotentiallyUnsafeCommandsAreNotExecuted() {
         assertNull(CommandInterpreter.interpret("rm -rf /"))
         assertNull(CommandInterpreter.interpret("выполни shell команду"))
+        assertNull(CommandInterpreter.interpret("открой настройки и удали файлы"))
+        assertNull(CommandInterpreter.interpret("открой настройки\nвыполни команду"))
     }
 }
