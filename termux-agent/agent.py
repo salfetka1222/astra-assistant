@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sqlite3
+from contextlib import closing
 import sys
 import time
 import urllib.error
@@ -92,9 +93,9 @@ def tool_workspace_summary(args: dict[str, Any]) -> dict[str, Any]:
     files = 0
     python_files = 0
     directories = 0
-    for item in list(folder.iterdir())[:101]:
-        if files + directories >= 100:
-            break
+    items = sorted(folder.iterdir(), key=lambda item: item.name.lower())
+    truncated = len(items) > 100
+    for item in items[:100]:
         if item.is_dir():
             directories += 1
         elif item.is_file():
@@ -103,7 +104,7 @@ def tool_workspace_summary(args: dict[str, Any]) -> dict[str, Any]:
                 python_files += 1
     return {"path": str(folder.relative_to(WORKSPACE)), "files": files,
             "python_files": python_files, "directories": directories,
-            "truncated": files + directories >= 100}
+            "truncated": truncated}
 
 
 def tool_read_file(args: dict[str, Any]) -> dict[str, Any]:
@@ -175,7 +176,7 @@ def tool_memory_add(args: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Укажи непустой текст в content.")
     if len(content) > 2000:
         raise ValueError("Одна запись памяти не может превышать 2000 символов.")
-    with _memory_connection() as db:
+    with closing(_memory_connection()) as db, db:
         cursor = db.execute("INSERT INTO memories(content) VALUES (?)", (content.strip(),))
         memory_id = cursor.lastrowid
     return {"ok": True, "id": memory_id, "saved": content.strip()}
@@ -183,7 +184,7 @@ def tool_memory_add(args: dict[str, Any]) -> dict[str, Any]:
 
 def tool_memory_search(args: dict[str, Any]) -> dict[str, Any]:
     query = str(args.get("query", "")).strip()
-    with _memory_connection() as db:
+    with closing(_memory_connection()) as db:
         if query:
             rows = db.execute("SELECT id, created_at, content FROM memories WHERE content LIKE ? ORDER BY id DESC LIMIT 20", ("%" + query[:200] + "%",)).fetchall()
         else:

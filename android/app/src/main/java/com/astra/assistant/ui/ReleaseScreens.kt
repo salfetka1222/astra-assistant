@@ -28,7 +28,6 @@ fun AboutAstraScreen(onBack: () -> Unit) {
         HorizontalDivider()
         Text("Создатель: ones #manera", style = MaterialTheme.typography.titleLarge)
         Text("Помощник: ChatGPT ♥️", style = MaterialTheme.typography.titleMedium)
-        val context = LocalContext.current
         Button(onClick = {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/astra_evolution"))
             runCatching { context.startActivity(intent) }
@@ -47,9 +46,9 @@ fun AstraSetupScreen(onBack: () -> Unit) {
     val steps = listOf(
         Triple("1. Установи Termux", "Установи Termux из официального F-Droid или GitHub. Команды ниже вводятся в терминале Termux.", ""),
         Triple("2. Подготовь Termux", "Обнови пакеты и установи Python и Git.", "pkg update && pkg install -y python git"),
-        Triple("3. Скачай компоненты Astra", "Скачай исходный код с GitHub. Команды работают в Termux.", "git clone -b feature/astra-1.0 https://github.com/salfetka1222/astra-assistant.git"),
+        Triple("3. Скачай компоненты Astra", "Скачай исходный код с GitHub. Команды работают в Termux.", "git clone -b feature/astra-1.2 https://github.com/salfetka1222/astra-assistant.git"),
         Triple("4. Запусти мост", "Открой папку Termux-агента и запусти локальный сервер. Не публикуй токен подключения.", "cd ~/astra-assistant/termux-agent && python bridge.py"),
-        Triple("5. Подключи приложение", "Скопируй токен из Termux, открой Astra → Инструменты → Termux и вставь токен. Затем проверь соединение.", ""),
+        Triple("5. Подключи приложение", "Используй токен, созданный локальным мостом, открой Astra → Инструменты → Termux и введи его. Затем проверь соединение. Никому не отправляй токен.", ""),
         Triple("6. Дополнительные разрешения", "Accessibility включается вручную в настройках Android, если нужны действия с интерфейсом. Shizuku необязателен. Не выдавай разрешения, назначение которых непонятно.", "")
     )
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(20.dp),
