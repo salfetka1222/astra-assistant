@@ -1,6 +1,8 @@
 package com.astra.assistant.ui
 
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import android.app.ActivityManager
 import android.os.BatteryManager
 import android.os.Environment
@@ -209,8 +211,26 @@ fun ChatScreen(
                         OutlinedTextField(value = draft, onValueChange = { draft = it },
                             modifier = Modifier.weight(1f), placeholder = { Text("Сообщение Astra…") },
                             shape = RoundedCornerShape(24.dp), maxLines = 4)
-                        Button(onClick = { viewModel.send(draft); draft = "" },
-                            enabled = draft.isNotBlank()) { Text("➤") }
+                        Button(onClick = {
+                            val command = draft.trim().lowercase().replace(Regex("\\s+"), " ")
+                            viewModel.send(draft)
+                            draft = ""
+                            when (command) {
+                                "открой настройки", "настройки android", "открыть настройки", "запусти настройки" -> {
+                                    try { context.startActivity(Intent(Settings.ACTION_SETTINGS)) }
+                                    catch (_: Exception) { showBridge = true }
+                                }
+                                "проверь подключение", "статус termux", "проверить мост",
+                                "диагностика подключения", "termux не работает" -> showBridge = true
+                            }
+                        }, enabled = draft.isNotBlank()) { Text("➤") }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = {
+                            try { context.startActivity(Intent(Settings.ACTION_SETTINGS)) }
+                            catch (_: Exception) { showBridge = true }
+                        }) { Text("Настройки Android") }
+                        TextButton(onClick = { showBridge = true }) { Text("Проверить Termux") }
                     }
                     TextButton(onClick = viewModel::clearHistory) { Text("Очистить историю") }
                 }
