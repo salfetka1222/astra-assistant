@@ -88,7 +88,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
             val status = connection.responseCode
             val response = if (status in 200..299) connection.inputStream else connection.errorStream
-            Pair(status, response?.bufferedReader(Charsets.UTF_8)?.use { it.readText().take(12000) } ?: "")
+            // Bound bytes read from the local bridge, not just the displayed text.
+            val data = response?.use { it.readNBytes(12_000) } ?: byteArrayOf()
+            Pair(status, data.toString(Charsets.UTF_8))
         } finally { connection.disconnect() }
     }
 
