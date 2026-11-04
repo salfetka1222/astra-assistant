@@ -193,6 +193,7 @@ fun ChatScreen(
                             Text("Подключение и команды", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    }
                 }
                 1 -> {
                     LazyColumn(
