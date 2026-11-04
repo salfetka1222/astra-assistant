@@ -99,24 +99,24 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/astra-release.jks"
 
-      - name: Verify APK version for 1.2.1 release
+      - name: Verify APK version for 1.3.0 release
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
         run: |
-          grep -Eq 'versionCode = 21([[:space:]]|$)' android/app/build.gradle.kts || exit 1
-          grep -Fq 'versionName = "1.2.1"' android/app/build.gradle.kts || { echo "Release requires final versionName 1.2.1"; exit 1; }
+          grep -Eq 'versionCode = 22([[:space:]]|$)' android/app/build.gradle.kts || exit 1
+          grep -Fq 'versionName = "1.3.0"' android/app/build.gradle.kts || { echo "Release requires final versionName 1.3.0"; exit 1; }
 
       - name: Validate release branch and unused tag
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          test "$GITHUB_REF" = "refs/heads/test/astra-1.2.1-build" || { echo "Unexpected release branch: $GITHUB_REF"; exit 1; }
+          test "$GITHUB_REF" = "refs/heads/feature/astra-1.3-diagnostics" || { echo "Unexpected release branch: $GITHUB_REF"; exit 1; }
           status=$(curl --silent --show-error --output "$RUNNER_TEMP/astra-tag-response.json" --write-out '%{http_code}' \
             --header "Authorization: Bearer $GH_TOKEN" \
             --header "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/git/ref/tags/astra-v21") || exit 1
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/git/ref/tags/astra-v22") || exit 1
           if [ "$status" = 404 ]; then
-            echo "Tag astra-v21 is available"
+            echo "Tag astra-v22 is available"
           else
             echo "Refusing publication: tag lookup returned HTTP $status"
             exit 1
@@ -127,8 +127,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           target_commitish: ${{ github.sha }}
-          tag_name: astra-v21
-          name: Astra Evolution 1.2.1
+          tag_name: astra-v22
+          name: Astra Evolution 1.3.0
           prerelease: false
           draft: false
           files: |
