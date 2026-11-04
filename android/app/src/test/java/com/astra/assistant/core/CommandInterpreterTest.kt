@@ -12,7 +12,7 @@ class CommandInterpreterTest {
 
     @Test fun diagnosticsAndConnectionHintsAreAvailable() {
         assertTrue(CommandInterpreter.interpret("Покажи состояние телефона")!!.contains("ОЗУ"))
-        assertTrue(CommandInterpreter.interpret("проверь подключение")!!.contains("Проверить всё"))
+        assertTrue(CommandInterpreter.interpret("проверь подключение")!!.contains("Проверяю подключение"))
         assertTrue(CommandInterpreter.interpret("специальные возможности")!!.contains("Accessibility"))
     }
 
