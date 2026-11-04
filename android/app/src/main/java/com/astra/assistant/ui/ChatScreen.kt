@@ -35,6 +35,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -131,7 +132,9 @@ fun ChatScreen(
                     Text("EVOLUTION • локальный режим", maxLines = 1, style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                TextButton(onClick = { showSettings = true }) { Text("⚙") }
+                IconButton(onClick = { showSettings = true }) {
+                    Text("⚙", style = MaterialTheme.typography.titleLarge)
+                }
             }
             when (selectedTab) {
                 0 -> {
@@ -190,14 +193,6 @@ fun ChatScreen(
                             Text("Подключение и команды", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    Card(onClick = { showSettings = true }, modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(24.dp)) {
-                        Column(modifier = Modifier.padding(cardPadding)) {
-                            Text("Настройки и обновления", style = MaterialTheme.typography.titleMedium)
-                            Text("Тема, версия и безопасность", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    }
                 }
                 1 -> {
                     LazyColumn(
@@ -220,17 +215,9 @@ fun ChatScreen(
                                     try { context.startActivity(Intent(Settings.ACTION_SETTINGS)) }
                                     catch (_: Exception) { showBridge = true }
                                 }
-                                "проверь подключение", "статус termux", "проверить мост",
                                 "диагностика подключения", "termux не работает" -> showBridge = true
                             }
                         }, enabled = draft.isNotBlank()) { Text("➤") }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = {
-                            try { context.startActivity(Intent(Settings.ACTION_SETTINGS)) }
-                            catch (_: Exception) { showBridge = true }
-                        }) { Text("Настройки Android") }
-                        TextButton(onClick = { showBridge = true }) { Text("Проверить Termux") }
                     }
                     TextButton(onClick = viewModel::clearHistory) { Text("Очистить историю") }
                 }
@@ -244,13 +231,6 @@ fun ChatScreen(
                         Column(modifier = Modifier.padding(20.dp)) {
                             Text("Termux", style = MaterialTheme.typography.titleLarge)
                             Text("Открыть существующий мост", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    Card(onClick = { showSettings = true }, modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(24.dp)) {
-                        Column(modifier = Modifier.padding(20.dp)) {
-                            Text("Параметры Astra", style = MaterialTheme.typography.titleLarge)
-                            Text("Тема и проверка обновлений", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     Text("Shizuku и новые инструменты появятся на следующих этапах.",
