@@ -36,6 +36,9 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -47,6 +50,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -73,6 +82,7 @@ fun ChatScreen(
     var showBridge by rememberSaveable { mutableStateOf(false) }
     var showUpdates by rememberSaveable { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableStateOf(0) }
+    var confirmClearHistory by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val cardPadding = when (buttonSize) { "extra" -> 30.dp; "large" -> 24.dp; else -> 18.dp }
     var deviceSummary by remember { mutableStateOf("Нажми «Обновить состояние», чтобы получить показатели.") }
@@ -104,18 +114,27 @@ fun ChatScreen(
         return
     }
 
+    if (confirmClearHistory) {
+        AlertDialog(
+            onDismissRequest = { confirmClearHistory = false },
+            title = { Text("Очистить историю?") },
+            text = { Text("Все сообщения будут удалены с устройства. Это действие нельзя отменить.") },
+            confirmButton = { TextButton(onClick = { viewModel.clearHistory(); confirmClearHistory = false }) { Text("Очистить") } },
+            dismissButton = { TextButton(onClick = { confirmClearHistory = false }) { Text("Отмена") } }
+        )
+    }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             NavigationBar(
-                modifier = Modifier.heightIn(min = 92.dp),
+                modifier = Modifier.heightIn(min = 72.dp),
                 containerColor = MaterialTheme.colorScheme.surface
             ) {
                 listOf("Главная", "Чат", "Инструменты").forEachIndexed { index, label ->
                     NavigationBarItem(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
-                        icon = { Text(listOf("⌂", "✦", "⚙")[index], fontSize = 27.sp) },
+                        icon = { Icon(when (index) { 0 -> Icons.Filled.Home; 1 -> Icons.AutoMirrored.Filled.Chat; else -> Icons.Filled.Build }, contentDescription = label) },
                         label = { Text(label, style = MaterialTheme.typography.labelLarge) }
                     )
                 }
@@ -133,7 +152,7 @@ fun ChatScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = { showSettings = true }) {
-                    Text("⚙", style = MaterialTheme.typography.titleLarge)
+                    Icon(Icons.Filled.Settings, contentDescription = "Настройки")
                 }
             }
             when (selectedTab) {
@@ -152,7 +171,7 @@ fun ChatScreen(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer)
                             Text("Astra готова к работе. Инструменты подключаются отдельно; ИИ пока в демонстрационном режиме.",
                                 color = MaterialTheme.colorScheme.onPrimaryContainer)
-                            Button(onClick = { selectedTab = 1 }) { Text("Открыть чат") }
+                            Button(onClick = { selectedTab = 1 }, modifier = Modifier.fillMaxWidth()) { Text("Перейти в чат") }
                         }
                     }
                     Card(
@@ -180,19 +199,6 @@ fun ChatScreen(
                             }) { Text("Обновить состояние") }
                         }
                     }
-                    Card(onClick = { showSetup = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) {
-                        Column(Modifier.padding(cardPadding)) {
-                            Text("Как подключить Astra", style = MaterialTheme.typography.titleMedium)
-                            Text("Пошаговая настройка Termux и Android")
-                        }
-                    }
-                    Card(onClick = { showBridge = true }, modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(24.dp)) {
-                        Column(modifier = Modifier.padding(cardPadding)) {
-                            Text("Termux Bridge", style = MaterialTheme.typography.titleMedium)
-                            Text("Подключение и команды", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
                     }
                 }
                 1 -> {
@@ -218,9 +224,9 @@ fun ChatScreen(
                                 }
                                 "диагностика подключения", "termux не работает" -> showBridge = true
                             }
-                        }, enabled = draft.isNotBlank()) { Text("➤") }
+                        }, enabled = draft.isNotBlank()) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить") }
                     }
-                    TextButton(onClick = viewModel::clearHistory) { Text("Очистить историю") }
+
                 }
                 else -> {
                     Column(
@@ -234,6 +240,13 @@ fun ChatScreen(
                             Text("Открыть существующий мост", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    Card(onClick = { showSetup = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Text("Инструкция подключения", style = MaterialTheme.typography.titleLarge)
+                            Text("Настройка Termux и Android", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    OutlinedButton(onClick = { confirmClearHistory = true }, modifier = Modifier.fillMaxWidth()) { Text("Очистить историю чата") }
                     Text("Shizuku и новые инструменты появятся на следующих этапах.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
