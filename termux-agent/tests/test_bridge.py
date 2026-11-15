@@ -10,6 +10,14 @@ import bridge
 
 class BridgeSafetyTests(unittest.TestCase):
     def setUp(self):
+        # Never read or use the developer's real ChatGPT session during unit tests.
+        # Each HTTP request sees a deterministic disconnected test account.
+        self.auth_patch = patch.object(bridge.chatgpt_connection, "status", return_value={
+            "state": "disconnected", "connected": False, "usage_enabled": False,
+            "account": "", "error": "",
+        })
+        self.auth_patch.start()
+        self.addCleanup(self.auth_patch.stop)
         self.token = "test-token-" + ("x" * 40)
         self.server = bridge.AstraBridgeServer((bridge.HOST, 0), self.token)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
