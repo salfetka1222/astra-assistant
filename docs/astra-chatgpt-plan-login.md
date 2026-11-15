@@ -1,29 +1,38 @@
-# Astra Evolution — official Sign in with ChatGPT integration plan
+# Astra Evolution 1.5.0-alpha.3 — Sign in with ChatGPT
 
-Status: **design only; not implemented in 1.5.0-alpha.2**.
+Implementation: `feature/astra-1.5-chatgpt-integration`. Experimental Preview only; stable release untouched.
 
-Official developer reference:
-https://developers.openai.com/siwc/token-sharing-open-source
+## What is implemented
 
-The open-source / local-host ChatGPT plan-usage OAuth flow is a better default than requiring everyone to supply an API key. It is distinct from the regular OpenAI API-key billing path, and it **does not share ChatGPT conversations, memories, or private files**.
+- Android button **Продолжить с ChatGPT** in **Инструменты → Мост Termux**.
+- Official OAuth authorization with `client_id=dynamic_agent_client` for first-time registration and a stable `ext_agent_host_id` in Termux private storage.
+- One-time loopback callback bound to `127.0.0.1` on an ephemeral port, with a five-minute deadline, PKCE S256, random state and OIDC nonce.
+- Token exchange with OpenAI's token endpoint. OIDC ID token signature verified using OpenAI's JWKS, with checks for issuer, audience, expiry, nonce, and subject.
+- Access/refresh/ID tokens stored under `~/.config/astra-evolution/chatgpt.json` with owner-only permissions. They never appear in Android API responses.
+- Only a validated, explicitly granted `chatgpt.tokens.use.direct` scope allows ChatGPT plan inference.
+- Selected model comes from the user's `GET /v1/models` catalog, with text-only `POST /v1/responses` using `store:false`, `stream:true`; model output is never used as an Android tool command.
+- Explicit status and disconnect controls. No silent paid API-key fallback (`ASTRA_ALLOW_PAID_API=1` is an opt-in development override, not required).
+- Existing Android system actions still require per-action confirmation.
 
-## Proposed secure architecture
+Official docs: https://developers.openai.com/siwc/token-sharing-open-source
 
-1. Keep Astra's existing Android UI, Room chat history and local, token-authenticated Termux Bridge. Preserve the production app's signing/data.
-2. On user tap **«Подключить ChatGPT»**, create and persist a stable per-device `ext_agent_host_id` (e.g. `urn:uuid:<UUIDv4>`). Store in Termux private data, never in Git.
-3. Start a one-shot loopback OAuth callback listener in Termux. Generate fresh state, nonce, PKCE verifier and SHA-256 challenge for every attempt.
-4. Open the official authorization flow in the system browser. Dynamically register/reuse the per-user `client_id` according to the current official Sign in with ChatGPT docs. Request ChatGPT plan usage scope only with clear, user-initiated opt-in.
-5. Validate OAuth callback state and ID token; check the granted scope `chatgpt.tokens.use.direct`. Absence of consent must leave plan-powered inference disabled.
-6. Protect access/refresh tokens in the local user-controlled runtime; never return them over `/v1/health` or `/v1/chat`, and never include tokens in URLs, logs or crash traces.
-7. Use the supported Responses API with `store:false`, `stream:true` and authorized access token. Add proper token refresh, expiry and revocation handling. No silent fallback to separately paid API calls.
-8. In Astra, show connected identity, consent state, usage management, reconnect, and disconnect. Disconnect must clear local credentials.
-9. Keep model text separate from Android actions. The existing exact-phrase allowlist and explicit on-device confirmation remain mandatory; never let AI output become shell commands, contact calls or Accessibility operations.
-10. Before release: integration tests for declined/revoked consent, wrong state/nonce, callback reuse, failed refresh, unavailable usage, rate limits, network losses and app backgrounding.
+## Test on the phone
 
-## Scope limitations
+1. Run `cd ~/astra-assistant/termux-agent && python bridge.py`. Keep it running.
+2. Open **Astra Preview → Инструменты → Мост Termux**. Enter the random Termux bridge token shown on the phone (if it changed), then check the bridge.
+3. Tap **Продолжить с ChatGPT**. A system browser opens the official `auth.openai.com` flow. Sign in there, choose your workspace and grant ChatGPT plan usage, if the consent is offered.
+4. After the callback says authorization is received, return to Astra and tap **Обновить статус**.
+5. Look for **ChatGPT подключён: использование плана разрешено**. Send a normal chat message in Astra to test Responses API.
+6. To disconnect, use **Отключить ChatGPT**. Local credentials are removed even if revoking the remote session is temporarily unavailable; check ChatGPT Settings if remote revocation wasn't confirmed.
 
-- ChatGPT app voice cannot be assumed to invoke Astra automatically; Android text sharing and the device's secure command bridge are separate features.
-- Sign-in does not replicate the exact model state, conversation, memory, or tools of the current ChatGPT app.
-- Live ChatGPT plan requests require the user's interactive browser consent and availability under current eligibility/usage policies.
-- Do not silently create an API key, spend credits, or publish a release.
-- Preview builds use a separate package identifier for testing, because the existing installed app has a different signing certificate from the CI release signer.
+Eligibility, regional policies and plan usage are controlled by OpenAI. Successful identity sign-in alone does not guarantee plan-powered inference. ChatGPT account sign-in **does not** transfer this ChatGPT conversation, memories, voice session or private data to Astra.
+
+## Security and limitations
+
+- Never paste ChatGPT passwords, callback codes, session cookies or OAuth access/refresh tokens into chat or GitHub.
+- An existing OpenAI API key in Termux is not used by this flow unless the user separately opts into the paid-API development override.
+- The OAuth feature is text-only; ChatGPT Android voice cannot directly invoke Astra through this mechanism.
+- A single saved account/registration is implemented in this Preview; multi-account picker and model picker remain future work.
+- Full real-account login and model inference must be tested interactively by the device owner. Unit tests use mocked tokens and no live account access.
+- GitHub Actions artifact downloads can be ZIP containers; for device testing extract the APK into Android **Downloads** as a plain `.apk`, without sharing ZIPs.
+- No public release without user approval.

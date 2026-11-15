@@ -64,7 +64,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val token = prefs.getString("bridge_token", "").orEmpty().trim()
         if (token.length < 32) {
             return@withContext engine.replyTo(message) +
-                "\n\nДля настоящих ответов ИИ подключи Termux Bridge и настрой модель в Termux."
+                "\n\nДля ответов ChatGPT подключи Termux Bridge и войди в аккаунт в разделе «Инструменты»."
         }
         try {
             val body = JSONObject().put("message", message)
@@ -78,9 +78,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     } else "ИИ не смог сформировать ответ."
                 }
                 401 -> "Termux Bridge: неверный токен. Проверь подключение в разделе «Инструменты»."
-                503 -> "Termux Bridge работает, но модель ИИ пока не настроена. " +
-                    "Нужен отдельный API-ключ или локальная модель в Termux."
-                502 -> "Модель ИИ недоступна. Проверь соединение с провайдером или локальной моделью."
+                503 -> "Войди в аккаунт ChatGPT через «Инструменты → Мост Termux → Продолжить с ChatGPT»."
+                403 -> "ChatGPT подключён, но использование плана не разрешено. Повтори вход с согласием."
+                502 -> "ChatGPT сейчас недоступен. Проверь подключение и лимиты в разделе «Инструменты»."
                 400, 413 -> "Termux Bridge отклонил сообщение. Проверь длину текста."
                 else -> "Не удалось получить ответ ИИ (HTTP $status)."
             }

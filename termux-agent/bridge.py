@@ -19,6 +19,7 @@ from typing import Any
 
 from agent import run_tool
 from model_chat import ModelNotConfigured, ModelUnavailable, chat_reply, is_model_configured, MAX_PROMPT_CHARS
+from chatgpt_oauth import ChatGPTAuthError, chatgpt_connection
 from security import Invocation, RequestSource, create_request_context
 
 HOST = "127.0.0.1"
@@ -133,9 +134,25 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
         if not self._authorized():
             self._send_json(401, {"ok": False, "error": "unauthorized"})
             return
+        if self.path == "/v1/auth/status":
+            try:
+                self._send_json(200, {"ok": True, **chatgpt_connection.status()})
+            except ChatGPTAuthError:
+                self._send_json(500, {"ok": False, "error": "auth_storage_unavailable"})
+            return
+        if self.path == "/v1/auth/models":
+            try:
+                self._send_json(200, {"ok": True, "models": chatgpt_connection.models()})
+            except ChatGPTAuthError:
+                self._send_json(503, {"ok": False, "error": "models_unavailable"})
+            return
         if self.path != "/v1/health":
             self._send_json(404, {"ok": False, "error": "not_found"})
             return
+        try:
+            oauth_ready = chatgpt_connection.status()["usage_enabled"]
+        except ChatGPTAuthError:
+            oauth_ready = False
         self._send_json(200, {
             "ok": True,
             "service": "Astra Termux Bridge",
@@ -144,7 +161,9 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
             "transport": "loopback",
             "uptime_seconds": max(0, int(time.monotonic() - self.server.started_at)),
             "tools": sorted(READ_ONLY_TOOLS),
-            "chat_available": is_model_configured(),
+            "chat_available": oauth_ready or (
+                os.environ.get("ASTRA_ALLOW_PAID_API") == "1" and is_model_configured()),
+            "chatgpt_plan_connected": oauth_ready,
         })
 
     def do_POST(self) -> None:
@@ -156,7 +175,7 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
         if not self._authorized():
             self._send_json(401, {"ok": False, "error": "unauthorized"})
             return
-        if self.path not in ("/v1/tool", "/v1/chat"):
+        if self.path not in ("/v1/tool", "/v1/chat", "/v1/auth/start", "/v1/auth/disconnect"):
             self._send_json(404, {"ok": False, "error": "not_found"})
             return
 
@@ -181,6 +200,21 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"ok": False, "error": "object_required"})
             return
 
+        if self.path in ("/v1/auth/start", "/v1/auth/disconnect"):
+            if payload:
+                self._send_json(400, {"ok": False, "error": "arguments_not_allowed"})
+                return
+            try:
+                if self.path == "/v1/auth/start":
+                    url = chatgpt_connection.start()
+                    self._send_json(200, {"ok": True, "authorize_url": url})
+                else:
+                    revoked = chatgpt_connection.disconnect()
+                    self._send_json(200, {"ok": True, "revocation_confirmed": revoked})
+            except (ChatGPTAuthError, OSError):
+                self._send_json(503, {"ok": False, "error": "authentication_unavailable"})
+            return
+
         if self.path == "/v1/chat":
             message = payload.get("message")
             if (not isinstance(message, str) or not message.strip()
@@ -188,7 +222,20 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
                 self._send_json(400, {"ok": False, "error": "invalid_message"})
                 return
             try:
-                reply = chat_reply(message)
+                oauth_status = chatgpt_connection.status()
+                if oauth_status["usage_enabled"]:
+                    reply = chatgpt_connection.reply(message)
+                elif oauth_status["connected"]:
+                    self._send_json(403, {"ok": False, "error": "plan_permission_not_granted"})
+                    return
+                elif os.environ.get("ASTRA_ALLOW_PAID_API") == "1":
+                    reply = chat_reply(message)
+                else:
+                    self._send_json(503, {"ok": False, "error": "chatgpt_sign_in_required"})
+                    return
+            except ChatGPTAuthError:
+                self._send_json(502, {"ok": False, "error": "chatgpt_unavailable"})
+                return
             except ModelNotConfigured:
                 self._send_json(503, {"ok": False, "error": "model_not_configured"})
                 return

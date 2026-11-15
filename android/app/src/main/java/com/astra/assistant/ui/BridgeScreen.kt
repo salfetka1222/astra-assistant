@@ -351,8 +351,9 @@ fun BridgeScreen(onBack: () -> Unit) {
             enabled = !busy && "workspace_summary" in supportedTools
         ) { Text("Анализ Python-файлов workspace") }
 
-        Text("Связь с ChatGPT", style = MaterialTheme.typography.titleMedium)
-        Text("Из ChatGPT используй «Поделиться» → Astra. Полученный текст появится в чате для проверки и отправки. Для ответов ИИ внутри Astra нужна настроенная модель в Termux.")
+        ChatGPTSignInCard(bridgeToken = token, onFeedback = { result = it })
+        Text("Передача текста из ChatGPT", style = MaterialTheme.typography.titleMedium)
+        Text("Также можно использовать «Поделиться» → Astra. Текст появится в черновике и не будет выполнен автоматически.")
         Text("Чтение файла workspace", style = MaterialTheme.typography.titleMedium)
         if ("read_file" !in supportedTools) Text("Чтение файлов отключено сервером моста. Доступен только список файлов.")
         OutlinedTextField(

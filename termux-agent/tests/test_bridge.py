@@ -1,5 +1,6 @@
 import http.client
 import json
+import os
 import threading
 import unittest
 from unittest.mock import patch
@@ -192,6 +193,7 @@ class BridgeSafetyTests(unittest.TestCase):
             self.assertEqual(status, 403)
             self.assertNotIn("PRIVATE_SECRET", json.dumps(payload))
 
+    @patch.dict(os.environ, {"ASTRA_ALLOW_PAID_API": "1"})
     def test_chat_requires_auth_and_never_runs_tools(self):
         body = {"message": "Привет"}
         with patch.object(bridge, "chat_reply", return_value="Здравствуйте") as chat, \
@@ -213,6 +215,7 @@ class BridgeSafetyTests(unittest.TestCase):
                     self.assertEqual(response["error"], "invalid_message")
                     chat.assert_not_called()
 
+    @patch.dict(os.environ, {"ASTRA_ALLOW_PAID_API": "1"})
     def test_chat_reports_missing_model_without_leak(self):
         with patch.object(bridge, "chat_reply", side_effect=bridge.ModelNotConfigured("secret")):
             status, response = self.request(
@@ -221,6 +224,7 @@ class BridgeSafetyTests(unittest.TestCase):
         self.assertEqual(response["error"], "model_not_configured")
         self.assertNotIn("secret", json.dumps(response))
 
+    @patch.dict(os.environ, {"ASTRA_ALLOW_PAID_API": "1"})
     def test_chat_reports_upstream_error_without_leak(self):
         with patch.object(bridge, "chat_reply", side_effect=bridge.ModelUnavailable("SECRET")):
             status, response = self.request(
