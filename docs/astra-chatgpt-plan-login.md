@@ -34,5 +34,9 @@ Eligibility, regional policies and plan usage are controlled by OpenAI. Successf
 - The OAuth feature is text-only; ChatGPT Android voice cannot directly invoke Astra through this mechanism.
 - A single saved account/registration is implemented in this Preview; multi-account picker and model picker remain future work.
 - Full real-account login and model inference must be tested interactively by the device owner. Unit tests use mocked tokens and no live account access.
-- GitHub Actions artifact downloads can be ZIP containers; for device testing extract the APK into Android **Downloads** as a plain `.apk`, without sharing ZIPs.
+- Android preview APKs are delivered as standalone `.apk` in Android **Downloads**, never as ZIP archives to the user.
+- GitHub Actions creates a fresh ephemeral debug signing identity on each run. For reproducible local testing, sign each downloaded debug APK with the persistent Termux-only key using `bash scripts/sign-preview-apk.sh INPUT.apk OUTPUT.apk`.
+- The permanent Preview signing key is in `~/.astra-preview-signing/astra-preview.jks` with its owner-only local password file; **never commit, export or disclose them publicly**. Its identity must be preserved to install later Preview builds over this one.
+- The previously installed alpha.2 used a different ephemeral certificate, so **the old Astra Preview must be uninstalled once** to install alpha.3. This deletes only Preview app data, not production Astra 1.4.0. Do not remove that preview automatically without the user's approval.
+- Do not install the unsigned/ephemerally signed GitHub APK over the permanent-key Preview: sign it locally using the script first.
 - No public release without user approval.
