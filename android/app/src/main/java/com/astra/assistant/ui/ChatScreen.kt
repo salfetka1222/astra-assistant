@@ -61,6 +61,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.astra.assistant.ThemeMode
+import com.astra.assistant.core.AndroidCommandParser
+import com.astra.assistant.core.ApprovedAndroidCommand
 import com.astra.assistant.data.MessageEntity
 
 @Composable
@@ -83,6 +85,8 @@ fun ChatScreen(
     var showUpdates by rememberSaveable { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     var confirmClearHistory by rememberSaveable { mutableStateOf(false) }
+    // Deliberately not saveable: a confirmation must not survive process recreation.
+    var pendingAndroidCommand by remember { mutableStateOf<ApprovedAndroidCommand?>(null) }
     val context = LocalContext.current
     val cardPadding = when (buttonSize) { "extra" -> 30.dp; "large" -> 24.dp; else -> 18.dp }
     var deviceSummary by remember { mutableStateOf("Нажми «Обновить состояние», чтобы получить показатели.") }
@@ -121,6 +125,37 @@ fun ChatScreen(
             text = { Text("Все сообщения будут удалены с устройства. Это действие нельзя отменить.") },
             confirmButton = { TextButton(onClick = { viewModel.clearHistory(); confirmClearHistory = false }) { Text("Очистить") } },
             dismissButton = { TextButton(onClick = { confirmClearHistory = false }) { Text("Отмена") } }
+        )
+    }
+    pendingAndroidCommand?.let { command ->
+        fun cancel() {
+            pendingAndroidCommand = null
+            viewModel.reportAndroidAction(command, null)
+        }
+        AlertDialog(
+            onDismissRequest = { cancel() },
+            title = { Text("Подтвердить действие Astra?") },
+            text = { Text("Открыть ${command.title}? Действие выполняется только после твоего подтверждения.") },
+            confirmButton = {
+                Button(onClick = {
+                    pendingAndroidCommand = null
+                    val intentAction = when (command) {
+                        ApprovedAndroidCommand.SETTINGS -> Settings.ACTION_SETTINGS
+                        ApprovedAndroidCommand.WIFI_SETTINGS -> Settings.ACTION_WIFI_SETTINGS
+                        ApprovedAndroidCommand.DISPLAY_SETTINGS -> Settings.ACTION_DISPLAY_SETTINGS
+                        ApprovedAndroidCommand.SOUND_SETTINGS -> Settings.ACTION_SOUND_SETTINGS
+                        ApprovedAndroidCommand.APP_SETTINGS -> Settings.ACTION_APPLICATION_SETTINGS
+                    }
+                    val success = try {
+                        context.startActivity(Intent(intentAction))
+                        true
+                    } catch (_: Exception) {
+                        false
+                    }
+                    viewModel.reportAndroidAction(command, success)
+                }) { Text("Открыть") }
+            },
+            dismissButton = { TextButton(onClick = { cancel() }) { Text("Отмена") } }
         )
     }
     Scaffold(
@@ -214,15 +249,13 @@ fun ChatScreen(
                             modifier = Modifier.weight(1f), placeholder = { Text("Сообщение Astra…") },
                             shape = RoundedCornerShape(24.dp), maxLines = 4)
                         Button(onClick = {
-                            val command = draft.trim().lowercase().replace(Regex("\\s+"), " ")
-                            viewModel.send(draft)
+                            val text = draft
+                            val normalized = text.trim().lowercase().replace(Regex("\\s+"), " ")
+                            pendingAndroidCommand = AndroidCommandParser.parse(text)
+                            viewModel.send(text)
                             draft = ""
-                            when (command) {
-                                "открой настройки", "настройки android", "открыть настройки", "запусти настройки" -> {
-                                    try { context.startActivity(Intent(Settings.ACTION_SETTINGS)) }
-                                    catch (_: Exception) { showBridge = true }
-                                }
-                                "диагностика подключения", "termux не работает" -> showBridge = true
+                            if (normalized in setOf("диагностика подключения", "termux не работает")) {
+                                showBridge = true
                             }
                         }, enabled = draft.isNotBlank()) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить") }
                     }
@@ -268,6 +301,14 @@ private fun SettingsScreen(
     buttonSize: String, onButtonSizeChange: (String) -> Unit,
     onSetup: () -> Unit, onAbout: () -> Unit
 ) {
+    val context = LocalContext.current
+    val installedVersion = remember(context) {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "неизвестна"
+        } catch (_: Exception) {
+            "неизвестна"
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -353,7 +394,7 @@ private fun SettingsScreen(
         Text("О приложении", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Astra Evolution • 1.1\nНастройки оформления и история сохраняются на устройстве. Сведения о приложении и обновлениях доступны в разделах выше.",
+            "Astra Evolution • $installedVersion\nНастройки оформления и история сохраняются на устройстве. Сведения о приложении и обновлениях доступны в разделах выше.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

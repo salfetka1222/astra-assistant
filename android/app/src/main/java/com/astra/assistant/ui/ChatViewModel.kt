@@ -14,6 +14,8 @@ import kotlinx.coroutines.withContext
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.astra.assistant.core.AssistantEngine
+import com.astra.assistant.core.AndroidCommandParser
+import com.astra.assistant.core.ApprovedAndroidCommand
 import com.astra.assistant.data.AppDatabase
 import com.astra.assistant.data.MessageEntity
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,10 +35,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun send(text: String) {
         val cleanText = text.trim()
         if (cleanText.isEmpty()) return
+        // Inspect raw input before trim: embedded or trailing newlines must not become actions.
+        val pendingAction = AndroidCommandParser.parse(text)
 
         viewModelScope.launch {
             dao.insert(MessageEntity(role = "user", content = cleanText))
-            val response = if (cleanText.trim().lowercase().replace(Regex("\\s+"), " ") in setOf(
+            val response = if (pendingAction != null) {
+                "Команда распознана: открыть ${pendingAction.title}. Подтверди или отмени действие в диалоге."
+            } else if (cleanText.trim().lowercase().replace(Regex("\\s+"), " ") in setOf(
                 "проверь батарею", "заряд батареи", "диагностика", "состояние телефона",
                 "покажи состояние телефона", "проверь телефон"
             )) deviceStatus() else when (cleanText.trim().lowercase().replace(Regex("\\s+"), " ")) {
@@ -110,6 +116,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         } catch (_: Exception) {
             "Не удалось получить показатели устройства. Открой раздел «Инструменты» для диагностики."
         }
+    }
+
+    fun reportAndroidAction(command: ApprovedAndroidCommand, success: Boolean?) {
+        val result = when (success) {
+            true -> "Команда отправлена Android: открыть ${command.title}."
+            false -> "Не удалось открыть ${command.title}. Android отклонил действие."
+            null -> "Действие отменено: ${command.title}."
+        }
+        viewModelScope.launch { dao.insert(MessageEntity(role = "assistant", content = result)) }
     }
 
     fun clearHistory() {
