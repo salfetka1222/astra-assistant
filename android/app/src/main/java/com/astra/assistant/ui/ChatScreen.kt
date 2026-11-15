@@ -41,6 +41,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,6 +68,8 @@ import com.astra.assistant.data.MessageEntity
 
 @Composable
 fun ChatScreen(
+    sharedText: String?,
+    onSharedTextConsumed: () -> Unit,
     themeMode: ThemeMode,
     onShowWhatsNew: () -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
@@ -90,6 +93,21 @@ fun ChatScreen(
     val context = LocalContext.current
     val cardPadding = when (buttonSize) { "extra" -> 30.dp; "large" -> 24.dp; else -> 18.dp }
     var deviceSummary by remember { mutableStateOf("Нажми «Обновить состояние», чтобы получить показатели.") }
+
+    // Receiving a share only populates the draft. It never sends text or runs commands.
+    LaunchedEffect(sharedText) {
+        if (!sharedText.isNullOrBlank()) {
+            draft = sharedText
+            pendingAndroidCommand = null
+            selectedTab = 1
+            showSettings = false
+            showSetup = false
+            showAbout = false
+            showBridge = false
+            showUpdates = false
+            onSharedTextConsumed()
+        }
+    }
 
     if (showSetup) { AstraSetupScreen(onBack = { showSetup = false }); return }
     if (showAbout) { AboutAstraScreen(onBack = { showAbout = false }); return }
@@ -183,7 +201,7 @@ fun ChatScreen(
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("ASTRA", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary, maxLines = 1)
-                    Text("EVOLUTION • локальный режим", maxLines = 1, style = MaterialTheme.typography.labelSmall,
+                    Text("EVOLUTION • Android + Termux", maxLines = 1, style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = { showSettings = true }) {
@@ -204,7 +222,7 @@ fun ChatScreen(
                         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("Центр управления", style = MaterialTheme.typography.headlineSmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer)
-                            Text("Astra готова к работе. Инструменты подключаются отдельно; ИИ пока в демонстрационном режиме.",
+                            Text("Astra готова к работе. Для диалога с ИИ подключи модель через защищённый Termux Bridge.",
                                 color = MaterialTheme.colorScheme.onPrimaryContainer)
                             Button(onClick = { selectedTab = 1 }, modifier = Modifier.fillMaxWidth()) { Text("Перейти в чат") }
                         }

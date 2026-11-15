@@ -15,8 +15,8 @@ android {
         applicationId = "com.astra.assistant"
         minSdk = 26
         targetSdk = 35
-        versionCode = 24
-        versionName = "1.5.0-dev"
+        versionCode = 25
+        versionName = "1.5.0-alpha.2"
     }
 
     val signingPath = System.getenv("ASTRA_SIGNING_KEYSTORE_PATH")

@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from agent import run_tool
+from model_chat import ModelNotConfigured, ModelUnavailable, chat_reply, is_model_configured, MAX_PROMPT_CHARS
 from security import Invocation, RequestSource, create_request_context
 
 HOST = "127.0.0.1"
@@ -143,6 +144,7 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
             "transport": "loopback",
             "uptime_seconds": max(0, int(time.monotonic() - self.server.started_at)),
             "tools": sorted(READ_ONLY_TOOLS),
+            "chat_available": is_model_configured(),
         })
 
     def do_POST(self) -> None:
@@ -154,7 +156,7 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
         if not self._authorized():
             self._send_json(401, {"ok": False, "error": "unauthorized"})
             return
-        if self.path != "/v1/tool":
+        if self.path not in ("/v1/tool", "/v1/chat"):
             self._send_json(404, {"ok": False, "error": "not_found"})
             return
 
@@ -177,6 +179,26 @@ class AstraBridgeHandler(BaseHTTPRequestHandler):
             return
         if not isinstance(payload, dict):
             self._send_json(400, {"ok": False, "error": "object_required"})
+            return
+
+        if self.path == "/v1/chat":
+            message = payload.get("message")
+            if (not isinstance(message, str) or not message.strip()
+                    or len(message) > MAX_PROMPT_CHARS):
+                self._send_json(400, {"ok": False, "error": "invalid_message"})
+                return
+            try:
+                reply = chat_reply(message)
+            except ModelNotConfigured:
+                self._send_json(503, {"ok": False, "error": "model_not_configured"})
+                return
+            except ModelUnavailable:
+                self._send_json(502, {"ok": False, "error": "model_unavailable"})
+                return
+            except Exception:
+                self._send_json(500, {"ok": False, "error": "internal_error"})
+                return
+            self._send_json(200, {"ok": True, "reply": reply})
             return
 
         name = payload.get("tool")

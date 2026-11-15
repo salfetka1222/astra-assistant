@@ -1,6 +1,7 @@
 package com.astra.assistant
 
 import android.os.Bundle
+import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -44,9 +45,23 @@ class MainActivity : ComponentActivity() {
     private var buttonSize by mutableStateOf("normal")
     private var showReleaseWelcome by mutableStateOf(false)
     private var showWhatsNew by mutableStateOf(false)
+    private var sharedText by mutableStateOf<String?>(null)
+
+    private fun acceptSharedText(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND || intent.type != "text/plain") return
+        val incoming = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+        if (incoming.isNotBlank()) sharedText = incoming.take(3000)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        acceptSharedText(intent)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        acceptSharedText(intent)
         themeMode = ThemeMode.fromStorage(
             getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(THEME_KEY, "system")
         )
@@ -145,6 +160,8 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = colors) {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     ChatScreen(
+                        sharedText = sharedText,
+                        onSharedTextConsumed = { sharedText = null },
                         themeMode = themeMode,
                         onShowWhatsNew = { showWhatsNew = true },
                         accent = accent, onAccentChange = { accent = it; prefs.edit().putString(ACCENT_KEY, it).apply() },

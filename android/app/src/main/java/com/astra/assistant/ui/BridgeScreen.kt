@@ -157,10 +157,12 @@ fun BridgeScreen(onBack: () -> Unit) {
                             val uptime = health.optLong("uptime_seconds", 0)
                             val tools = health.optJSONArray("tools")
                             val available = (0 until (tools?.length() ?: 0)).joinToString(", ") { tools?.optString(it).orEmpty() }
+                            val aiStatus = if (health.optBoolean("chat_available")) "ИИ подключён" else "ИИ не настроен"
                             Pair("Astra Bridge: ${health.optString("status", "неизвестно")}\n" +
                                 "Соединение: ${health.optString("transport", "неизвестно")}\n" +
                                 "Время работы: ${uptime} сек.\n" +
-                                "Разрешённые инструменты: $available", (0 until (tools?.length() ?: 0)).map { tools?.optString(it).orEmpty() }.toSet())
+                                "Разрешённые инструменты: $available\n" +
+                                "Диалог: $aiStatus", (0 until (tools?.length() ?: 0)).map { tools?.optString(it).orEmpty() }.toSet())
                         } else {
                             Pair("HTTP $status\n$text", emptySet<String>())
                         }
@@ -349,6 +351,8 @@ fun BridgeScreen(onBack: () -> Unit) {
             enabled = !busy && "workspace_summary" in supportedTools
         ) { Text("Анализ Python-файлов workspace") }
 
+        Text("Связь с ChatGPT", style = MaterialTheme.typography.titleMedium)
+        Text("Из ChatGPT используй «Поделиться» → Astra. Полученный текст появится в чате для проверки и отправки. Для ответов ИИ внутри Astra нужна настроенная модель в Termux.")
         Text("Чтение файла workspace", style = MaterialTheme.typography.titleMedium)
         if ("read_file" !in supportedTools) Text("Чтение файлов отключено сервером моста. Доступен только список файлов.")
         OutlinedTextField(

@@ -192,6 +192,43 @@ class BridgeSafetyTests(unittest.TestCase):
             self.assertEqual(status, 403)
             self.assertNotIn("PRIVATE_SECRET", json.dumps(payload))
 
+    def test_chat_requires_auth_and_never_runs_tools(self):
+        body = {"message": "Привет"}
+        with patch.object(bridge, "chat_reply", return_value="Здравствуйте") as chat, \
+                patch.object(bridge, "run_tool") as runner:
+            self.assertEqual(self.request("POST", "/v1/chat", body)[0], 401)
+            status, response = self.request("POST", "/v1/chat", body, token=self.token)
+            self.assertEqual(status, 200)
+            self.assertEqual(response["reply"], "Здравствуйте")
+            chat.assert_called_once_with("Привет")
+            runner.assert_not_called()
+
+    def test_chat_rejects_invalid_messages(self):
+        for value in (123, "", "a" * (bridge.MAX_PROMPT_CHARS + 1), {"tool": "list_files"}):
+            with self.subTest(value=type(value).__name__):
+                with patch.object(bridge, "chat_reply") as chat:
+                    status, response = self.request(
+                        "POST", "/v1/chat", {"message": value}, token=self.token)
+                    self.assertEqual(status, 400)
+                    self.assertEqual(response["error"], "invalid_message")
+                    chat.assert_not_called()
+
+    def test_chat_reports_missing_model_without_leak(self):
+        with patch.object(bridge, "chat_reply", side_effect=bridge.ModelNotConfigured("secret")):
+            status, response = self.request(
+                "POST", "/v1/chat", {"message": "Привет"}, token=self.token)
+        self.assertEqual(status, 503)
+        self.assertEqual(response["error"], "model_not_configured")
+        self.assertNotIn("secret", json.dumps(response))
+
+    def test_chat_reports_upstream_error_without_leak(self):
+        with patch.object(bridge, "chat_reply", side_effect=bridge.ModelUnavailable("SECRET")):
+            status, response = self.request(
+                "POST", "/v1/chat", {"message": "Привет"}, token=self.token)
+        self.assertEqual(status, 502)
+        self.assertEqual(response["error"], "model_unavailable")
+        self.assertNotIn("SECRET", json.dumps(response))
+
 
 if __name__ == "__main__":
     unittest.main()

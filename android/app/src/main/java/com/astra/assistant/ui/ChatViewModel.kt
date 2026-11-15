@@ -49,9 +49,43 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 "покажи файлы", "список файлов", "файлы termux", "что в workspace" -> bridgeRequest("list_files")
                 "анализ workspace", "анализ python файлов" -> bridgeRequest("workspace_summary")
                 "проверь termux", "статус termux", "проверь подключение", "проверить мост" -> bridgeRequest(null)
-                else -> engine.replyTo(cleanText)
+                else -> modelReplyOrDemo(cleanText)
             }
             dao.insert(MessageEntity(role = "assistant", content = response))
+        }
+    }
+
+    private suspend fun modelReplyOrDemo(message: String): String = withContext(Dispatchers.IO) {
+        if (message.length > 3000) {
+            return@withContext "Для диалога с ИИ сократи сообщение до 3000 символов."
+        }
+        val prefs = getApplication<Application>()
+            .getSharedPreferences("astra_bridge_preferences", Context.MODE_PRIVATE)
+        val token = prefs.getString("bridge_token", "").orEmpty().trim()
+        if (token.length < 32) {
+            return@withContext engine.replyTo(message) +
+                "\n\nДля настоящих ответов ИИ подключи Termux Bridge и настрой модель в Termux."
+        }
+        try {
+            val body = JSONObject().put("message", message)
+            val (status, jsonText) = bridgeCall("/v1/chat", token, body, readTimeoutMs = 55_000)
+            when (status) {
+                200 -> {
+                    val json = JSONObject(jsonText)
+                    if (json.optBoolean("ok")) {
+                        json.optString("reply").takeIf { it.isNotBlank() }
+                            ?: "ИИ вернул пустой ответ."
+                    } else "ИИ не смог сформировать ответ."
+                }
+                401 -> "Termux Bridge: неверный токен. Проверь подключение в разделе «Инструменты»."
+                503 -> "Termux Bridge работает, но модель ИИ пока не настроена. " +
+                    "Нужен отдельный API-ключ или локальная модель в Termux."
+                502 -> "Модель ИИ недоступна. Проверь соединение с провайдером или локальной моделью."
+                400, 413 -> "Termux Bridge отклонил сообщение. Проверь длину текста."
+                else -> "Не удалось получить ответ ИИ (HTTP $status)."
+            }
+        } catch (_: Exception) {
+            "Нет подключения к ИИ через Termux Bridge. Проверь статус моста в «Инструментах»."
         }
     }
 
@@ -80,12 +114,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun bridgeCall(path: String, token: String, body: JSONObject?): Pair<Int, String> {
+    private fun bridgeCall(path: String, token: String, body: JSONObject?, readTimeoutMs: Int = 4000): Pair<Int, String> {
         val connection = URL("http://127.0.0.1:8765$path").openConnection() as HttpURLConnection
         return try {
             connection.requestMethod = if (body == null) "GET" else "POST"
             connection.connectTimeout = 2500
-            connection.readTimeout = 4000
+            connection.readTimeout = readTimeoutMs
             connection.setRequestProperty("Authorization", "Bearer $token")
             if (body != null) {
                 connection.doOutput = true
