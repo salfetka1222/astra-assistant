@@ -43,4 +43,6 @@ Security: Do not commit API keys to GitHub or paste them into chats. The bridge 
 - No shared conversational context yet: each model request is independent.
 - Call contacts only after explicit contact matching and per-call confirmation in a future release.
 - Only this development branch is changed; no public signed release without approval.
-- Test signed APKs should be placed as a **standalone `.apk`** in Android Downloads, not distributed to the user as ZIP archives.
+- Development debug builds use application ID `com.astra.assistant.preview` and label **Astra Preview**. They can install alongside the stable app even if the signing certificates differ.
+- Test APKs should be placed as a **standalone `.apk`** in Android Downloads, not distributed to the user as ZIP archives.
+- Do not uninstall stable Astra to install a mismatched-signature test build.

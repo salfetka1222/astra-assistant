@@ -4,7 +4,7 @@
     <application
         android:allowBackup="false"
         android:networkSecurityConfig="@xml/astra_network_security_config"
-        android:label="Astra Assistant"
+        android:label="${appLabel}"
         android:icon="@drawable/astra_icon"
         android:roundIcon="@drawable/astra_icon"
         android:supportsRtl="true"

@@ -17,6 +17,7 @@ android {
         targetSdk = 35
         versionCode = 25
         versionName = "1.5.0-alpha.2"
+        manifestPlaceholders["appLabel"] = "Astra Evolution"
     }
 
     val signingPath = System.getenv("ASTRA_SIGNING_KEYSTORE_PATH")
@@ -37,6 +38,11 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            // Installable alongside stable Astra without changing its data or signing key.
+            applicationIdSuffix = ".preview"
+            manifestPlaceholders["appLabel"] = "Astra Preview"
+        }
         getByName("release") {
             if (releaseSigningConfigured) {
                 signingConfig = signingConfigs.getByName("astraRelease")
