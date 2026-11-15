@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.NavigationBar
@@ -80,6 +81,8 @@ fun ChatScreen(
     viewModel: ChatViewModel = viewModel()
 ) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
+    val pendingReplies by viewModel.pendingReplies.collectAsStateWithLifecycle()
+    val chatListState = rememberLazyListState()
     var draft by rememberSaveable { mutableStateOf("") }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showSetup by rememberSaveable { mutableStateOf(false) }
@@ -93,6 +96,18 @@ fun ChatScreen(
     val context = LocalContext.current
     val cardPadding = when (buttonSize) { "extra" -> 30.dp; "large" -> 24.dp; else -> 18.dp }
     var deviceSummary by remember { mutableStateOf("Нажми «Обновить состояние», чтобы получить показатели.") }
+
+    // Keep the typing bubble visible when the user is already near the newest message.
+    // Don't interrupt someone who has scrolled up to read older messages.
+    LaunchedEffect(messages.size, pendingReplies, selectedTab) {
+        if (selectedTab == 1) {
+            val total = chatListState.layoutInfo.totalItemsCount
+            val lastVisible = chatListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            if (total > 0 && lastVisible >= (total - 3).coerceAtLeast(0)) {
+                chatListState.animateScrollToItem(total - 1)
+            }
+        }
+    }
 
     // Receiving a share only populates the draft. It never sends text or runs commands.
     LaunchedEffect(sharedText) {
@@ -256,10 +271,14 @@ fun ChatScreen(
                 }
                 1 -> {
                     LazyColumn(
+                        state = chatListState,
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(messages, key = { it.id }) { message -> MessageBubble(message) }
+                        if (pendingReplies > 0) {
+                            item(key = "astra_typing") { AstraTypingIndicator() }
+                        }
                     }
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -18,13 +18,20 @@ import com.astra.assistant.core.AndroidCommandParser
 import com.astra.assistant.core.ApprovedAndroidCommand
 import com.astra.assistant.data.AppDatabase
 import com.astra.assistant.data.MessageEntity
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = AppDatabase.getInstance(application).messageDao()
     private val engine = AssistantEngine()
+
+    // Count concurrent replies so the animation stays visible until the last finishes.
+    private val _pendingReplies = MutableStateFlow(0)
+    val pendingReplies = _pendingReplies.asStateFlow()
 
     val messages = dao.observeAll().stateIn(
         scope = viewModelScope,
@@ -38,20 +45,28 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Inspect raw input before trim: embedded or trailing newlines must not become actions.
         val pendingAction = AndroidCommandParser.parse(text)
 
+        // Set before launching the coroutine: the indicator appears immediately on Send.
+        _pendingReplies.update { it + 1 }
         viewModelScope.launch {
-            dao.insert(MessageEntity(role = "user", content = cleanText))
-            val response = if (pendingAction != null) {
-                "Команда распознана: открыть ${pendingAction.title}. Подтверди или отмени действие в диалоге."
-            } else if (cleanText.trim().lowercase().replace(Regex("\\s+"), " ") in setOf(
-                "проверь батарею", "заряд батареи", "диагностика", "состояние телефона",
-                "покажи состояние телефона", "проверь телефон"
-            )) deviceStatus() else when (cleanText.trim().lowercase().replace(Regex("\\s+"), " ")) {
-                "покажи файлы", "список файлов", "файлы termux", "что в workspace" -> bridgeRequest("list_files")
-                "анализ workspace", "анализ python файлов" -> bridgeRequest("workspace_summary")
-                "проверь termux", "статус termux", "проверь подключение", "проверить мост" -> bridgeRequest(null)
-                else -> modelReplyOrDemo(cleanText)
+            try {
+                dao.insert(MessageEntity(role = "user", content = cleanText))
+                val response = if (pendingAction != null) {
+                    "Команда распознана: открыть ${pendingAction.title}. Подтверди или отмени действие в диалоге."
+                } else if (cleanText.trim().lowercase().replace(Regex("\\s+"), " ") in setOf(
+                    "проверь батарею", "заряд батареи", "диагностика", "состояние телефона",
+                    "покажи состояние телефона", "проверь телефон"
+                )) deviceStatus() else when (cleanText.trim().lowercase().replace(Regex("\\s+"), " ")) {
+                    "покажи файлы", "список файлов", "файлы termux", "что в workspace" -> bridgeRequest("list_files")
+                    "анализ workspace", "анализ python файлов" -> bridgeRequest("workspace_summary")
+                    "проверь termux", "статус termux", "проверь подключение", "проверить мост" -> bridgeRequest(null)
+                    else -> modelReplyOrDemo(cleanText)
+                }
+                // Persist the answer before hiding the typing indicator.
+                dao.insert(MessageEntity(role = "assistant", content = response))
+            } finally {
+                // Also executes on network failure or coroutine cancellation.
+                _pendingReplies.update { (it - 1).coerceAtLeast(0) }
             }
-            dao.insert(MessageEntity(role = "assistant", content = response))
         }
     }
 
