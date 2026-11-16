@@ -3,15 +3,15 @@ package com.astra.assistant.core
 import java.util.Locale
 
 /**
- * Only exact, reviewed phrases can request an Android action.
- * This parser never executes an action and never interprets AI-generated commands.
+ * Exact phrases from user-authored input only; never called on AI-generated text.
+ * The parser does not execute any action.
  */
-enum class ApprovedAndroidCommand(val title: String) {
-    SETTINGS("настройки Android"),
-    WIFI_SETTINGS("настройки Wi-Fi"),
-    DISPLAY_SETTINGS("настройки экрана"),
-    SOUND_SETTINGS("настройки звука"),
-    APP_SETTINGS("список приложений")
+enum class ApprovedAndroidCommand(val title: String, val actionId: String) {
+    SETTINGS("настройки Android", "settings.open"),
+    WIFI_SETTINGS("настройки Wi-Fi", "settings.wifi.open"),
+    DISPLAY_SETTINGS("настройки экрана", "settings.display.open"),
+    SOUND_SETTINGS("настройки звука", "settings.sound.open"),
+    APP_SETTINGS("список приложений", "settings.apps.open")
 }
 
 object AndroidCommandParser {

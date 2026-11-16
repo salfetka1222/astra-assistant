@@ -1,25 +1,25 @@
 package com.astra.assistant.core
 
-/**
- * Pure Kotlin foundation for native Astra actions.
- * Planning does not grant permissions and never executes device operations.
- */
+import java.util.Locale
+
+/** Astra 2.0: a closed allowlist. AI text never grants device permissions. */
 enum class ActionRisk { READ_ONLY, NAVIGATION, SENSITIVE }
 
 data class AstraAction(
     val id: String,
+    val title: String,
     val risk: ActionRisk,
     val requiresConfirmation: Boolean
 )
 
 object AstraActionRegistry {
     private val actions = listOf(
-        AstraAction("device.status", ActionRisk.READ_ONLY, false),
-        AstraAction("settings.open", ActionRisk.NAVIGATION, true),
-        AstraAction("settings.wifi.open", ActionRisk.NAVIGATION, true),
-        AstraAction("settings.display.open", ActionRisk.NAVIGATION, true),
-        AstraAction("settings.sound.open", ActionRisk.NAVIGATION, true),
-        AstraAction("settings.apps.open", ActionRisk.NAVIGATION, true)
+        AstraAction("device.status", "состояние телефона", ActionRisk.READ_ONLY, false),
+        AstraAction("settings.open", "настройки Android", ActionRisk.NAVIGATION, true),
+        AstraAction("settings.wifi.open", "настройки Wi-Fi", ActionRisk.NAVIGATION, true),
+        AstraAction("settings.display.open", "настройки экрана", ActionRisk.NAVIGATION, true),
+        AstraAction("settings.sound.open", "настройки звука", ActionRisk.NAVIGATION, true),
+        AstraAction("settings.apps.open", "список приложений", ActionRisk.NAVIGATION, true)
     ).associateBy { it.id }
 
     fun find(id: String): AstraAction? = actions[id]
@@ -36,9 +36,10 @@ sealed class AstraPermissionDecision {
 }
 
 object AstraPermissionGuard {
-    /** Only known actions are eligible. A caller cannot bypass confirmation. */
     fun check(actionId: String, confirmed: Boolean): AstraPermissionDecision {
         val action = AstraActionRegistry.find(actionId) ?: return AstraPermissionDecision.Denied
+        // Sensitive operations will require a separate capability-specific policy.
+        if (action.risk == ActionRisk.SENSITIVE) return AstraPermissionDecision.Denied
         return if (action.requiresConfirmation && !confirmed) {
             AstraPermissionDecision.ConfirmationRequired
         } else {
@@ -47,13 +48,28 @@ object AstraPermissionGuard {
     }
 }
 
-/** Plans are bounded, registry-validated, and never run automatically. */
+/**
+ * Understand -> Plan. Execution and user confirmation happen separately.
+ * No free-form instructions, AI responses or multiple commands are interpreted.
+ */
 object AstraTaskEngine {
     const val MAX_STEPS = 8
+    private val statusPhrases = setOf(
+        "проверь батарею", "заряд батареи", "диагностика", "состояние телефона",
+        "покажи состояние телефона", "проверь телефон"
+    )
 
     fun plan(actionIds: List<String>): AstraTaskPlan? {
         if (actionIds.isEmpty() || actionIds.size > MAX_STEPS) return null
         if (actionIds.any { AstraActionRegistry.find(it) == null }) return null
         return AstraTaskPlan(actionIds.map(::AstraTaskStep))
+    }
+
+    fun fromUserText(input: String): AstraTaskPlan? {
+        if (input.length > 100 || input.any { it == '\n' || it == '\r' }) return null
+        val normalized = input.trim().lowercase(Locale.ROOT).replace(Regex("\\s+"), " ")
+        val actionId = AndroidCommandParser.parse(input)?.actionId
+            ?: if (normalized in statusPhrases) "device.status" else return null
+        return plan(listOf(actionId))
     }
 }

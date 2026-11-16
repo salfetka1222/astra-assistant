@@ -1,8 +1,6 @@
 package com.astra.assistant.ui
 
 import android.content.Context
-import android.content.Intent
-import android.provider.Settings
 import android.app.ActivityManager
 import android.os.BatteryManager
 import android.os.Environment
@@ -63,8 +61,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.astra.assistant.ThemeMode
-import com.astra.assistant.core.AndroidCommandParser
-import com.astra.assistant.core.ApprovedAndroidCommand
+import com.astra.assistant.core.AstraTaskEngine
+import com.astra.assistant.core.AstraTaskPlan
+import com.astra.assistant.core.AstraActionRegistry
+import com.astra.assistant.core.AstraNativeActionExecutor
 import com.astra.assistant.data.MessageEntity
 
 @Composable
@@ -92,7 +92,7 @@ fun ChatScreen(
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     var confirmClearHistory by rememberSaveable { mutableStateOf(false) }
     // Deliberately not saveable: a confirmation must not survive process recreation.
-    var pendingAndroidCommand by remember { mutableStateOf<ApprovedAndroidCommand?>(null) }
+    var pendingNativePlan by remember { mutableStateOf<AstraTaskPlan?>(null) }
     val context = LocalContext.current
     val cardPadding = when (buttonSize) { "extra" -> 30.dp; "large" -> 24.dp; else -> 18.dp }
     var deviceSummary by remember { mutableStateOf("Нажми «Обновить состояние», чтобы получить показатели.") }
@@ -113,7 +113,7 @@ fun ChatScreen(
     LaunchedEffect(sharedText) {
         if (!sharedText.isNullOrBlank()) {
             draft = sharedText
-            pendingAndroidCommand = null
+            pendingNativePlan = null
             selectedTab = 1
             showSettings = false
             showSetup = false
@@ -160,32 +160,23 @@ fun ChatScreen(
             dismissButton = { TextButton(onClick = { confirmClearHistory = false }) { Text("Отмена") } }
         )
     }
-    pendingAndroidCommand?.let { command ->
+    pendingNativePlan?.let { plan ->
+        val title = plan.steps.singleOrNull()
+            ?.let { AstraActionRegistry.find(it.actionId)?.title } ?: "действие"
         fun cancel() {
-            pendingAndroidCommand = null
-            viewModel.reportAndroidAction(command, null)
+            pendingNativePlan = null
+            viewModel.reportNativeAction("Действие отменено: $title.")
         }
         AlertDialog(
             onDismissRequest = { cancel() },
             title = { Text("Подтвердить действие Astra?") },
-            text = { Text("Открыть ${command.title}? Действие выполняется только после твоего подтверждения.") },
+            text = { Text("Открыть $title? Действие выполняется только после твоего подтверждения.") },
             confirmButton = {
                 Button(onClick = {
-                    pendingAndroidCommand = null
-                    val intentAction = when (command) {
-                        ApprovedAndroidCommand.SETTINGS -> Settings.ACTION_SETTINGS
-                        ApprovedAndroidCommand.WIFI_SETTINGS -> Settings.ACTION_WIFI_SETTINGS
-                        ApprovedAndroidCommand.DISPLAY_SETTINGS -> Settings.ACTION_DISPLAY_SETTINGS
-                        ApprovedAndroidCommand.SOUND_SETTINGS -> Settings.ACTION_SOUND_SETTINGS
-                        ApprovedAndroidCommand.APP_SETTINGS -> Settings.ACTION_APPLICATION_SETTINGS
-                    }
-                    val success = try {
-                        context.startActivity(Intent(intentAction))
-                        true
-                    } catch (_: Exception) {
-                        false
-                    }
-                    viewModel.reportAndroidAction(command, success)
+                    pendingNativePlan = null
+                    // Only this explicit button sends confirmed=true to the executor.
+                    val result = AstraNativeActionExecutor.execute(context, plan, confirmed = true)
+                    viewModel.reportNativeAction(result.message)
                 }) { Text("Открыть") }
             },
             dismissButton = { TextButton(onClick = { cancel() }) { Text("Отмена") } }
@@ -288,7 +279,9 @@ fun ChatScreen(
                         Button(onClick = {
                             val text = draft
                             val normalized = text.trim().lowercase().replace(Regex("\\s+"), " ")
-                            pendingAndroidCommand = AndroidCommandParser.parse(text)
+                            pendingNativePlan = AstraTaskEngine.fromUserText(text)?.takeIf { plan ->
+                                plan.steps.any { AstraActionRegistry.find(it.actionId)?.requiresConfirmation == true }
+                            }
                             viewModel.send(text)
                             draft = ""
                             if (normalized in setOf("диагностика подключения", "termux не работает")) {
