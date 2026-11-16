@@ -11,7 +11,7 @@ class WhatsNewCatalogTest {
     }
 
     @Test fun bundledChangelogHasContent() {
-        assertEquals("2.0.0-alpha.1", WhatsNewCatalog.current.id)
+        assertEquals("2.0.0-alpha.2", WhatsNewCatalog.current.id)
         assertTrue(WhatsNewCatalog.current.changes.isNotEmpty())
         assertTrue(WhatsNewCatalog.current.changes.all { it.title.isNotBlank() && it.details.isNotBlank() })
     }

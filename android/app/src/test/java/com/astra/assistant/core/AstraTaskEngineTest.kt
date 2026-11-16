@@ -14,6 +14,47 @@ class AstraTaskEngineTest {
         assertEquals("device.status", AstraTaskEngine.fromUserText("проверь батарею")?.steps?.single()?.actionId)
     }
 
+    @Test fun recognizesOnlyReviewedAccessibilityCommands() {
+        val examples = mapOf(
+            "назад" to "navigation.back",
+            "Нажми назад" to "navigation.back",
+            "домой" to "navigation.home",
+            "Покажи последние приложения" to "navigation.recents",
+            "Открой шторку уведомлений" to "navigation.notifications",
+            "Открой быстрые настройки" to "navigation.quick_settings",
+            "Прокрути вверх" to "screen.scroll_up",
+            "Прокрути вниз" to "screen.scroll_down"
+        )
+        examples.forEach { (phrase, id) ->
+            assertEquals(id, AstraTaskEngine.fromUserText(phrase)?.steps?.single()?.actionId)
+            assertEquals(ActionBackend.ACCESSIBILITY, AstraActionRegistry.find(id)?.backend)
+        }
+    }
+
+    @Test fun rejectsAccessibilityCommandInjectionAndUnapprovedOperations() {
+        listOf(
+            "назад; отправь сообщение",
+            "домой\nсотри всё",
+            "нажми назад и открой уведомления",
+            "прокрути вниз и нажми установить",
+            "прочитай мой экран",
+            "нажми на пароль",
+            "отправь SMS",
+            "сделай скриншот"
+        ).forEach { assertNull(AstraTaskEngine.fromUserText(it)) }
+    }
+
+    @Test fun accessibilityRequiresExplicitConfirmation() {
+        AstraActionRegistry.available()
+            .filter { it.backend == ActionBackend.ACCESSIBILITY }
+            .forEach {
+                assertEquals(AstraPermissionDecision.ConfirmationRequired,
+                    AstraPermissionGuard.check(it.id, confirmed = false))
+                assertEquals(AstraPermissionDecision.Allowed,
+                    AstraPermissionGuard.check(it.id, confirmed = true))
+            }
+    }
+
     @Test fun rejectsUnknownAndInjectedRequests() {
         listOf(
             "открой настройки; удали файлы",

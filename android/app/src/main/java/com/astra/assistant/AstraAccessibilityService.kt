@@ -8,7 +8,10 @@ import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import java.lang.ref.WeakReference
 
-/** Manual-only Android controls. No screen content capture or background automation. */
+/**
+ * User-initiated Android navigation only. Does not retrieve screen text or touch targets.
+ * All requests come from the app UI or its explicit manual control panel.
+ */
 class AstraAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -32,17 +35,19 @@ class AstraAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
-    private fun execute(action: String): Boolean = when (action) {
-        "back" -> performGlobalAction(GLOBAL_ACTION_BACK)
-        "home" -> performGlobalAction(GLOBAL_ACTION_HOME)
-        "recents" -> performGlobalAction(GLOBAL_ACTION_RECENTS)
-        "notifications" -> performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
-        "quick_settings" -> performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
-        "scroll_up", "scroll_down" -> swipe(action == "scroll_up")
-        else -> false
+    private fun execute(action: String, callback: (Boolean) -> Unit) {
+        when (action) {
+            "back" -> callback(performGlobalAction(GLOBAL_ACTION_BACK))
+            "home" -> callback(performGlobalAction(GLOBAL_ACTION_HOME))
+            "recents" -> callback(performGlobalAction(GLOBAL_ACTION_RECENTS))
+            "notifications" -> callback(performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS))
+            "quick_settings" -> callback(performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS))
+            "scroll_up", "scroll_down" -> swipe(action == "scroll_up", callback)
+            else -> callback(false)
+        }
     }
 
-    private fun swipe(up: Boolean): Boolean {
+    private fun swipe(up: Boolean, callback: (Boolean) -> Unit) {
         val display = resources.displayMetrics
         val x = display.widthPixels * 0.5f
         val top = display.heightPixels * 0.32f
@@ -54,20 +59,44 @@ class AstraAccessibilityService : AccessibilityService() {
         val gesture = GestureDescription.Builder()
             .addStroke(GestureDescription.StrokeDescription(path, 0, 400))
             .build()
-        return dispatchGesture(gesture, null, null)
+        val dispatched = dispatchGesture(
+            gesture,
+            object : GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription) {
+                    callback(true)
+                }
+                override fun onCancelled(gestureDescription: GestureDescription) {
+                    callback(false)
+                }
+            },
+            Handler(Looper.getMainLooper())
+        )
+        if (!dispatched) callback(false)
     }
 
     companion object {
         const val PREFS_NAME = "astra_accessibility_status"
         const val ACCESSIBILITY_CURRENT_PACKAGE = "current_package"
         const val ACCESSIBILITY_LAST_EVENT_AT = "last_event_at"
+
+        @Volatile
         private var activeService: WeakReference<AstraAccessibilityService>? = null
 
-        /** Called only from a direct button press in Astra's local UI. */
+        fun isRunning(): Boolean = activeService?.get() != null
+
+        /** Requires a direct user interaction; also used by the existing manual control panel. */
         fun performManualAction(action: String, callback: (Boolean) -> Unit) {
             Handler(Looper.getMainLooper()).post {
                 val service = activeService?.get()
-                callback(service?.execute(action) ?: false)
+                if (service == null) {
+                    callback(false)
+                } else {
+                    try {
+                        service.execute(action, callback)
+                    } catch (_: Exception) {
+                        callback(false)
+                    }
+                }
             }
         }
     }

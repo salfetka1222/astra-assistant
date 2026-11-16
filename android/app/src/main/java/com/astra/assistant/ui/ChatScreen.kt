@@ -1,6 +1,8 @@
 package com.astra.assistant.ui
 
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import android.app.ActivityManager
 import android.os.BatteryManager
 import android.os.Environment
@@ -61,6 +63,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.astra.assistant.ThemeMode
+import com.astra.assistant.AstraAccessibilityService
+import com.astra.assistant.core.ActionBackend
 import com.astra.assistant.core.AstraTaskEngine
 import com.astra.assistant.core.AstraTaskPlan
 import com.astra.assistant.core.AstraActionRegistry
@@ -96,6 +100,7 @@ fun ChatScreen(
     val context = LocalContext.current
     val cardPadding = when (buttonSize) { "extra" -> 30.dp; "large" -> 24.dp; else -> 18.dp }
     var deviceSummary by remember { mutableStateOf("Нажми «Обновить состояние», чтобы получить показатели.") }
+    var accessibilityRunning by remember { mutableStateOf(AstraAccessibilityService.isRunning()) }
 
     // Keep the typing bubble visible when the user is already near the newest message.
     // Don't interrupt someone who has scrolled up to read older messages.
@@ -161,8 +166,9 @@ fun ChatScreen(
         )
     }
     pendingNativePlan?.let { plan ->
-        val title = plan.steps.singleOrNull()
-            ?.let { AstraActionRegistry.find(it.actionId)?.title } ?: "действие"
+        val action = plan.steps.singleOrNull()?.let { AstraActionRegistry.find(it.actionId) }
+        val title = action?.title ?: "действие"
+        val usesAccessibility = action?.backend == ActionBackend.ACCESSIBILITY
         fun cancel() {
             pendingNativePlan = null
             viewModel.reportNativeAction("Действие отменено: $title.")
@@ -170,14 +176,23 @@ fun ChatScreen(
         AlertDialog(
             onDismissRequest = { cancel() },
             title = { Text("Подтвердить действие Astra?") },
-            text = { Text("Открыть $title? Действие выполняется только после твоего подтверждения.") },
+            text = {
+                Text(if (usesAccessibility) "Выполнить «$title» через Accessibility?"
+                     else "Открыть $title? Действие выполняется только после твоего подтверждения.")
+            },
             confirmButton = {
                 Button(onClick = {
                     pendingNativePlan = null
-                    // Only this explicit button sends confirmed=true to the executor.
-                    val result = AstraNativeActionExecutor.execute(context, plan, confirmed = true)
-                    viewModel.reportNativeAction(result.message)
-                }) { Text("Открыть") }
+                    // Only this explicit button grants one-time confirmation.
+                    if (usesAccessibility) {
+                        AstraNativeActionExecutor.executeAccessibility(plan, confirmed = true) { result ->
+                            viewModel.reportNativeAction(result.message)
+                        }
+                    } else {
+                        val result = AstraNativeActionExecutor.execute(context, plan, confirmed = true)
+                        viewModel.reportNativeAction(result.message)
+                    }
+                }) { Text(if (usesAccessibility) "Выполнить" else "Открыть") }
             },
             dismissButton = { TextButton(onClick = { cancel() }) { Text("Отмена") } }
         )
@@ -296,11 +311,32 @@ fun ChatScreen(
                         modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) {
+                        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Управление Android", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                if (accessibilityRunning) "Astra Accessibility активна"
+                                else "Astra Accessibility не подключена",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = {
+                                    accessibilityRunning = AstraAccessibilityService.isRunning()
+                                }) { Text("Проверить") }
+                                OutlinedButton(onClick = {
+                                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                                }) { Text("Настроить") }
+                            }
+                            Text("Команды навигации требуют подтверждения в чате. Termux не нужен.",
+                                style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                     Card(onClick = { showBridge = true }, modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(24.dp)) {
                         Column(modifier = Modifier.padding(20.dp)) {
                             Text("Termux", style = MaterialTheme.typography.titleLarge)
-                            Text("Открыть существующий мост", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Необязательный мост для ChatGPT и прежних инструментов",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     Card(onClick = { showSetup = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) {

@@ -56,7 +56,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             AstraNativeActionExecutor.execute(getApplication<Application>(), nativePlan, confirmed = false).message
                         }
                     } else {
-                        "Команда распознана: открыть ${action?.title ?: "настройки"}. Подтверди или отмени действие в диалоге."
+                        "Команда распознана: ${action?.title ?: "действие"}. Подтверди или отмени её в диалоге."
                     }
                 } else when (cleanText.trim().lowercase().replace(Regex("\\s+"), " ")) {
                     "покажи файлы", "список файлов", "файлы termux", "что в workspace" -> bridgeRequest("list_files")
