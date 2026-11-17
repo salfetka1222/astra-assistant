@@ -1,6 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Narrow visibility only for the three explicitly supported system launch intents. -->
+    <queries>
+        <intent><action android:name="android.media.action.STILL_IMAGE_CAMERA" /></intent>
+        <intent><action android:name="android.intent.action.SHOW_ALARMS" /></intent>
+        <intent><action android:name="android.intent.action.DIAL" /></intent>
+    </queries>
     <application
         android:allowBackup="false"
         android:networkSecurityConfig="@xml/astra_network_security_config"

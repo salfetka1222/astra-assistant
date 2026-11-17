@@ -66,7 +66,7 @@ import com.astra.assistant.ThemeMode
 import com.astra.assistant.AstraAccessibilityService
 import com.astra.assistant.core.ActionBackend
 import com.astra.assistant.core.AstraTaskEngine
-import com.astra.assistant.core.AstraTaskPlan
+import com.astra.assistant.core.AstraConfirmationToken
 import com.astra.assistant.core.AstraActionRegistry
 import com.astra.assistant.core.AstraNativeActionExecutor
 import com.astra.assistant.data.MessageEntity
@@ -96,7 +96,7 @@ fun ChatScreen(
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     var confirmClearHistory by rememberSaveable { mutableStateOf(false) }
     // Deliberately not saveable: a confirmation must not survive process recreation.
-    var pendingNativePlan by remember { mutableStateOf<AstraTaskPlan?>(null) }
+    var pendingNativeAction by remember { mutableStateOf<AstraConfirmationToken?>(null) }
     val context = LocalContext.current
     val cardPadding = when (buttonSize) { "extra" -> 30.dp; "large" -> 24.dp; else -> 18.dp }
     var deviceSummary by remember { mutableStateOf("Нажми «Обновить состояние», чтобы получить показатели.") }
@@ -118,7 +118,7 @@ fun ChatScreen(
     LaunchedEffect(sharedText) {
         if (!sharedText.isNullOrBlank()) {
             draft = sharedText
-            pendingNativePlan = null
+            pendingNativeAction = null
             selectedTab = 1
             showSettings = false
             showSetup = false
@@ -165,12 +165,14 @@ fun ChatScreen(
             dismissButton = { TextButton(onClick = { confirmClearHistory = false }) { Text("Отмена") } }
         )
     }
-    pendingNativePlan?.let { plan ->
+    pendingNativeAction?.let { request ->
+        val plan = request.plan
         val action = plan.steps.singleOrNull()?.let { AstraActionRegistry.find(it.actionId) }
         val title = action?.title ?: "действие"
         val usesAccessibility = action?.backend == ActionBackend.ACCESSIBILITY
         fun cancel() {
-            pendingNativePlan = null
+            if (!request.consume()) return
+            pendingNativeAction = null
             viewModel.reportNativeAction("Действие отменено: $title.")
         }
         AlertDialog(
@@ -181,8 +183,9 @@ fun ChatScreen(
                      else "Открыть $title? Действие выполняется только после твоего подтверждения.")
             },
             confirmButton = {
-                Button(onClick = {
-                    pendingNativePlan = null
+                Button(onClick = confirm@{
+                    if (!request.consume()) return@confirm
+                    pendingNativeAction = null
                     // Only this explicit button grants one-time confirmation.
                     if (usesAccessibility) {
                         AstraNativeActionExecutor.executeAccessibility(plan, confirmed = true) { result ->
@@ -294,15 +297,16 @@ fun ChatScreen(
                         Button(onClick = {
                             val text = draft
                             val normalized = text.trim().lowercase().replace(Regex("\\s+"), " ")
-                            pendingNativePlan = AstraTaskEngine.fromUserText(text)?.takeIf { plan ->
+                            if (pendingNativeAction != null) return@Button
+                            pendingNativeAction = AstraTaskEngine.fromUserText(text)?.takeIf { plan ->
                                 plan.steps.any { AstraActionRegistry.find(it.actionId)?.requiresConfirmation == true }
-                            }
+                            }?.let(::AstraConfirmationToken)
                             viewModel.send(text)
                             draft = ""
                             if (normalized in setOf("диагностика подключения", "termux не работает")) {
                                 showBridge = true
                             }
-                        }, enabled = draft.isNotBlank()) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить") }
+                        }, enabled = draft.isNotBlank() && pendingNativeAction == null) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить") }
                     }
 
                 }

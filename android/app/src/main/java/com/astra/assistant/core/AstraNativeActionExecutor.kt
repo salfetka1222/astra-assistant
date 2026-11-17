@@ -3,6 +3,7 @@ package com.astra.assistant.core
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
+import android.content.ActivityNotFoundException
 import android.os.BatteryManager
 import android.os.Environment
 import android.os.StatFs
@@ -115,10 +116,18 @@ object AstraNativeActionExecutor {
             else -> return AstraExecutionResult(false, "Приложение не разрешено политикой Astra.")
         }
         return try {
-            context.startActivity(Intent(intentAction).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            AstraExecutionResult(true, "Команда отправлена Android: открыть ${action.title}.")
+            val intent = Intent(intentAction).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (intent.resolveActivity(context.packageManager) == null) {
+                return AstraExecutionResult(false, "На устройстве не найдено приложение для команды: ${action.title}.")
+            }
+            context.startActivity(intent)
+            AstraExecutionResult(true, "Запрос открыть ${action.title} передан Android. Результат на экране ещё не проверен.")
+        } catch (_: ActivityNotFoundException) {
+            AstraExecutionResult(false, "Не найдено приложение для команды: ${action.title}.")
+        } catch (_: SecurityException) {
+            AstraExecutionResult(false, "Android запретил открытие: ${action.title}.")
         } catch (_: Exception) {
-            AstraExecutionResult(false, "Не удалось открыть ${action.title}. Проверь наличие системного приложения.")
+            AstraExecutionResult(false, "Не удалось отправить команду открытия: ${action.title}.")
         }
     }
 
@@ -133,9 +142,13 @@ object AstraNativeActionExecutor {
         }
         return try {
             context.startActivity(Intent(intentAction).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            AstraExecutionResult(true, "Команда отправлена Android: открыть ${action.title}.")
+            AstraExecutionResult(true, "Запрос открыть ${action.title} передан Android. Результат на экране ещё не проверен.")
+        } catch (_: ActivityNotFoundException) {
+            AstraExecutionResult(false, "На устройстве нет обработчика для команды: ${action.title}.")
+        } catch (_: SecurityException) {
+            AstraExecutionResult(false, "Android запретил открытие: ${action.title}.")
         } catch (_: Exception) {
-            AstraExecutionResult(false, "Не удалось открыть ${action.title}. Android отклонил действие.")
+            AstraExecutionResult(false, "Не удалось отправить команду открытия: ${action.title}.")
         }
     }
 
