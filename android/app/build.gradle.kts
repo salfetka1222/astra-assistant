@@ -15,8 +15,8 @@ android {
         applicationId = "com.astra.assistant"
         minSdk = 26
         targetSdk = 35
-        versionCode = 33
-        versionName = "2.0.0-alpha.6"
+        versionCode = 34
+        versionName = "2.0.0-alpha.7"
         manifestPlaceholders["appLabel"] = "Astra Evolution"
     }
 

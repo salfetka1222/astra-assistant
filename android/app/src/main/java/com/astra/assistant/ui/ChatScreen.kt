@@ -43,6 +43,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,6 +63,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.astra.assistant.ThemeMode
 import com.astra.assistant.AstraAccessibilityService
 import com.astra.assistant.core.ActionBackend
@@ -69,6 +73,9 @@ import com.astra.assistant.core.AstraTaskEngine
 import com.astra.assistant.core.AstraConfirmationToken
 import com.astra.assistant.core.AstraActionRegistry
 import com.astra.assistant.core.AstraNativeActionExecutor
+import com.astra.assistant.core.DeviceAppCatalog
+import com.astra.assistant.core.AppCatalog
+import com.astra.assistant.core.AppCatalogSnapshot
 import com.astra.assistant.data.MessageEntity
 
 @Composable
@@ -98,6 +105,12 @@ fun ChatScreen(
     // Deliberately not saveable: a confirmation must not survive process recreation.
     var pendingNativeAction by remember { mutableStateOf<AstraConfirmationToken?>(null) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var appCatalog by remember { mutableStateOf<AppCatalogSnapshot?>(DeviceAppCatalog.load(context)) }
+    var appCatalogQuery by remember { mutableStateOf("") }
+    var confirmAppCatalogScan by remember { mutableStateOf(false) }
+    var appCatalogBusy by remember { mutableStateOf(false) }
+    var appCatalogMessage by remember { mutableStateOf<String?>(null) }
     val cardPadding = when (buttonSize) { "extra" -> 30.dp; "large" -> 24.dp; else -> 18.dp }
     var deviceSummary by remember { mutableStateOf("Нажми «Обновить состояние», чтобы получить показатели.") }
     var deviceMapReport by remember { mutableStateOf<String?>(null) }
@@ -164,6 +177,35 @@ fun ChatScreen(
             text = { Text("Все сообщения будут удалены с устройства. Это действие нельзя отменить.") },
             confirmButton = { TextButton(onClick = { viewModel.clearHistory(); confirmClearHistory = false }) { Text("Очистить") } },
             dismissButton = { TextButton(onClick = { confirmClearHistory = false }) { Text("Отмена") } }
+        )
+    }
+    if (confirmAppCatalogScan) {
+        AlertDialog(
+            onDismissRequest = { confirmAppCatalogScan = false },
+            title = { Text("Изучить установленные приложения?") },
+            text = { Text("Astra сохранит в памяти приложения только названия и идентификаторы доступных для запуска программ. Она не читает переписки, данные приложений или файлы. Каталог останется на телефоне, пока ты его не удалишь.") },
+            confirmButton = {
+                Button(onClick = {
+                    confirmAppCatalogScan = false
+                    if (!appCatalogBusy) {
+                        appCatalogBusy = true
+                        scope.launch {
+                            appCatalogMessage = null
+                            try {
+                                appCatalog = withContext(Dispatchers.IO) {
+                                    DeviceAppCatalog.scanAndRemember(context.applicationContext)
+                                }
+                                appCatalogMessage = "Каталог обновлён. Доступные приложения сохранены только на этом устройстве."
+                            } catch (_: Exception) {
+                                appCatalogMessage = "Не удалось создать каталог приложений. Повтори попытку."
+                            } finally {
+                                appCatalogBusy = false
+                            }
+                        }
+                    }
+                }) { Text("Сканировать") }
+            },
+            dismissButton = { TextButton(onClick = { confirmAppCatalogScan = false }) { Text("Отмена") } }
         )
     }
     pendingNativeAction?.let { request ->
@@ -348,6 +390,45 @@ fun ChatScreen(
                                     AstraNativeActionExecutor.execute(context, plan, confirmed = false).message
                                 } ?: "Не удалось сформировать карту устройства."
                             }) { Text(if (deviceMapReport == null) "Изучить телефон" else "Обновить карту") }
+                        }
+                    }
+                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) {
+                        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Каталог приложений", style = MaterialTheme.typography.titleLarge)
+                            Text("По твоему разрешению Astra запомнит названия запускаемых приложений. Не читает их внутренние данные и не отправляет каталог в сеть.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            appCatalogMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                            appCatalog?.let { snapshot ->
+                                Text("Доступно приложений: ${snapshot.apps.size}${if (snapshot.truncated) " (каталог ограничен)" else ""}")
+                                if (snapshot.apps.isNotEmpty()) {
+                                    OutlinedTextField(
+                                        value = appCatalogQuery,
+                                        onValueChange = { appCatalogQuery = it.take(80) },
+                                        label = { Text("Найти приложение") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    AppCatalog.search(snapshot.apps, appCatalogQuery).forEach { item ->
+                                        Text("${item.label} · ${item.packageName}", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = { confirmAppCatalogScan = true },
+                                enabled = !appCatalogBusy
+                            ) { Text(if (appCatalogBusy) "Сканирование…" else "Изучить приложения") }
+                            if (appCatalog != null) {
+                                TextButton(onClick = {
+                                    if (DeviceAppCatalog.clear(context.applicationContext)) {
+                                        appCatalog = null
+                                        appCatalogQuery = ""
+                                        appCatalogMessage = "Локальный каталог удалён."
+                                    } else {
+                                        appCatalogMessage = "Не удалось удалить каталог."
+                                    }
+                                }, enabled = !appCatalogBusy) { Text("Удалить каталог") }
+                            }
                         }
                     }
                     Card(onClick = { showBridge = true }, modifier = Modifier.fillMaxWidth(),
