@@ -4,7 +4,7 @@ import java.util.Locale
 
 /** A closed allowlist: natural language can select actions, never create new permissions. */
 enum class ActionRisk { READ_ONLY, NAVIGATION, SENSITIVE }
-enum class ActionBackend { DEVICE_STATUS, DEVICE_CAPABILITIES, SETTINGS, APP_LAUNCH, ACCESSIBILITY }
+enum class ActionBackend { DEVICE_STATUS, DEVICE_CAPABILITIES, DEVICE_MAP, SETTINGS, APP_LAUNCH, ACCESSIBILITY }
 
 data class AstraAction(
     val id: String,
@@ -18,6 +18,7 @@ object AstraActionRegistry {
     private val actions = listOf(
         AstraAction("device.status", "состояние телефона", ActionRisk.READ_ONLY, false, ActionBackend.DEVICE_STATUS),
         AstraAction("device.capabilities", "возможности Astra", ActionRisk.READ_ONLY, false, ActionBackend.DEVICE_CAPABILITIES),
+        AstraAction("device.map", "карту устройства", ActionRisk.READ_ONLY, false, ActionBackend.DEVICE_MAP),
         AstraAction("apps.camera.open", "камеру", ActionRisk.NAVIGATION, true, ActionBackend.APP_LAUNCH),
         AstraAction("apps.alarms.open", "будильники", ActionRisk.NAVIGATION, true, ActionBackend.APP_LAUNCH),
         AstraAction("apps.dialer.open", "набор номера", ActionRisk.NAVIGATION, true, ActionBackend.APP_LAUNCH),
@@ -73,6 +74,10 @@ object AstraTaskEngine {
         "покажи состояние телефона", "проверь телефон"
     )
     private val nativePhrases = mapOf(
+        "изучи мой телефон" to "device.map",
+        "карта устройства" to "device.map",
+        "покажи карту устройства" to "device.map",
+        "проверь возможности телефона" to "device.map",
         "что ты умеешь на телефоне" to "device.capabilities",
         "покажи возможности" to "device.capabilities",
         "какие команды доступны" to "device.capabilities",

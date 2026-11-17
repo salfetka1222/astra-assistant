@@ -100,6 +100,7 @@ fun ChatScreen(
     val context = LocalContext.current
     val cardPadding = when (buttonSize) { "extra" -> 30.dp; "large" -> 24.dp; else -> 18.dp }
     var deviceSummary by remember { mutableStateOf("Нажми «Обновить состояние», чтобы получить показатели.") }
+    var deviceMapReport by remember { mutableStateOf<String?>(null) }
     var accessibilityRunning by remember { mutableStateOf(AstraAccessibilityService.isRunning()) }
 
     // Keep the typing bubble visible when the user is already near the newest message.
@@ -333,6 +334,20 @@ fun ChatScreen(
                             }
                             Text("Без Termux: «открой камеру», «открой будильник», «открой телефон», «покажи возможности». Навигация требует подтверждения в чате.",
                                 style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) {
+                        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Карта устройства", style = MaterialTheme.typography.titleLarge)
+                            Text("Локальная проверка возможностей Android. Без доступа к перепискам, файлам и перечню приложений.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            deviceMapReport?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                            OutlinedButton(onClick = {
+                                deviceMapReport = AstraTaskEngine.plan(listOf("device.map"))?.let { plan ->
+                                    AstraNativeActionExecutor.execute(context, plan, confirmed = false).message
+                                } ?: "Не удалось сформировать карту устройства."
+                            }) { Text(if (deviceMapReport == null) "Изучить телефон" else "Обновить карту") }
                         }
                     }
                     Card(onClick = { showBridge = true }, modifier = Modifier.fillMaxWidth(),

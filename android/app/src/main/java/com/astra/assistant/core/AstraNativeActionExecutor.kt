@@ -34,6 +34,7 @@ object AstraNativeActionExecutor {
         return when (action.backend) {
             ActionBackend.DEVICE_STATUS -> readDeviceStatus(context)
             ActionBackend.DEVICE_CAPABILITIES -> readNativeCapabilities()
+            ActionBackend.DEVICE_MAP -> AstraExecutionResult(true, DeviceIntelligence.report(context))
             ActionBackend.SETTINGS -> openSettings(context, action)
             ActionBackend.APP_LAUNCH -> openSystemApp(context, action)
             ActionBackend.ACCESSIBILITY ->
