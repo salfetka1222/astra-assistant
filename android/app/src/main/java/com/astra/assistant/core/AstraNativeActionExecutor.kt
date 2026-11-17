@@ -6,6 +6,8 @@ import android.content.Intent
 import android.os.BatteryManager
 import android.os.Environment
 import android.os.StatFs
+import android.provider.AlarmClock
+import android.provider.MediaStore
 import android.provider.Settings
 import com.astra.assistant.AstraAccessibilityService
 
@@ -30,7 +32,9 @@ object AstraNativeActionExecutor {
         }
         return when (action.backend) {
             ActionBackend.DEVICE_STATUS -> readDeviceStatus(context)
+            ActionBackend.DEVICE_CAPABILITIES -> readNativeCapabilities()
             ActionBackend.SETTINGS -> openSettings(context, action)
+            ActionBackend.APP_LAUNCH -> openSystemApp(context, action)
             ActionBackend.ACCESSIBILITY ->
                 AstraExecutionResult(false, "Для этой команды требуется исполнитель Accessibility.")
         }
@@ -86,6 +90,35 @@ object AstraNativeActionExecutor {
                 if (accepted) "Android принял команду: ${action.title}."
                 else "Android не смог выполнить команду: ${action.title}."
             ))
+        }
+    }
+
+    private fun readNativeCapabilities(): AstraExecutionResult {
+        val count = AstraActionRegistry.available().size
+        val accessibility = if (AstraAccessibilityService.isRunning()) "активна" else "не подключена"
+        return AstraExecutionResult(
+            true,
+            "Нативные возможности Astra\n" +
+                "Зарегистрировано команд: $count\n" +
+                "Accessibility: $accessibility\n" +
+                "Без Termux: диагностика телефона, открытие системных приложений и настроек.\n" +
+                "Для навигации требуется подтверждение. Для ответов ChatGPT пока нужен Termux Bridge."
+        )
+    }
+
+    /** Opens a system application; never dials a number or accesses its private data. */
+    private fun openSystemApp(context: Context, action: AstraAction): AstraExecutionResult {
+        val intentAction = when (action.id) {
+            "apps.camera.open" -> MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA
+            "apps.alarms.open" -> AlarmClock.ACTION_SHOW_ALARMS
+            "apps.dialer.open" -> Intent.ACTION_DIAL
+            else -> return AstraExecutionResult(false, "Приложение не разрешено политикой Astra.")
+        }
+        return try {
+            context.startActivity(Intent(intentAction).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            AstraExecutionResult(true, "Команда отправлена Android: открыть ${action.title}.")
+        } catch (_: Exception) {
+            AstraExecutionResult(false, "Не удалось открыть ${action.title}. Проверь наличие системного приложения.")
         }
     }
 

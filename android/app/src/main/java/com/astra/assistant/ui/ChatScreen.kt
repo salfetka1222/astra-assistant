@@ -327,7 +327,7 @@ fun ChatScreen(
                                     context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                                 }) { Text("Настроить") }
                             }
-                            Text("Команды навигации требуют подтверждения в чате. Termux не нужен.",
+                            Text("Без Termux: «открой камеру», «открой будильник», «открой телефон», «покажи возможности». Навигация требует подтверждения в чате.",
                                 style = MaterialTheme.typography.bodySmall)
                         }
                     }

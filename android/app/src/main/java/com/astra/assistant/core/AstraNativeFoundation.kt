@@ -4,7 +4,7 @@ import java.util.Locale
 
 /** A closed allowlist: natural language can select actions, never create new permissions. */
 enum class ActionRisk { READ_ONLY, NAVIGATION, SENSITIVE }
-enum class ActionBackend { DEVICE_STATUS, SETTINGS, ACCESSIBILITY }
+enum class ActionBackend { DEVICE_STATUS, DEVICE_CAPABILITIES, SETTINGS, APP_LAUNCH, ACCESSIBILITY }
 
 data class AstraAction(
     val id: String,
@@ -17,6 +17,10 @@ data class AstraAction(
 object AstraActionRegistry {
     private val actions = listOf(
         AstraAction("device.status", "состояние телефона", ActionRisk.READ_ONLY, false, ActionBackend.DEVICE_STATUS),
+        AstraAction("device.capabilities", "возможности Astra", ActionRisk.READ_ONLY, false, ActionBackend.DEVICE_CAPABILITIES),
+        AstraAction("apps.camera.open", "камеру", ActionRisk.NAVIGATION, true, ActionBackend.APP_LAUNCH),
+        AstraAction("apps.alarms.open", "будильники", ActionRisk.NAVIGATION, true, ActionBackend.APP_LAUNCH),
+        AstraAction("apps.dialer.open", "набор номера", ActionRisk.NAVIGATION, true, ActionBackend.APP_LAUNCH),
         AstraAction("settings.open", "настройки Android", ActionRisk.NAVIGATION, true, ActionBackend.SETTINGS),
         AstraAction("settings.wifi.open", "настройки Wi-Fi", ActionRisk.NAVIGATION, true, ActionBackend.SETTINGS),
         AstraAction("settings.display.open", "настройки экрана", ActionRisk.NAVIGATION, true, ActionBackend.SETTINGS),
@@ -68,6 +72,17 @@ object AstraTaskEngine {
         "проверь батарею", "заряд батареи", "диагностика", "состояние телефона",
         "покажи состояние телефона", "проверь телефон"
     )
+    private val nativePhrases = mapOf(
+        "что ты умеешь на телефоне" to "device.capabilities",
+        "покажи возможности" to "device.capabilities",
+        "какие команды доступны" to "device.capabilities",
+        "открой камеру" to "apps.camera.open",
+        "запусти камеру" to "apps.camera.open",
+        "открой будильник" to "apps.alarms.open",
+        "покажи будильники" to "apps.alarms.open",
+        "открой телефон" to "apps.dialer.open",
+        "открой набор номера" to "apps.dialer.open"
+    )
     private val accessibilityPhrases = mapOf(
         "назад" to "navigation.back",
         "нажми назад" to "navigation.back",
@@ -100,6 +115,7 @@ object AstraTaskEngine {
         if (input.length > 100 || input.any { it == '\n' || it == '\r' }) return null
         val normalized = input.trim().lowercase(Locale.ROOT).replace(Regex("\\s+"), " ")
         val actionId = AndroidCommandParser.parse(input)?.actionId
+            ?: nativePhrases[normalized]
             ?: accessibilityPhrases[normalized]
             ?: if (normalized in statusPhrases) "device.status" else return null
         return plan(listOf(actionId))

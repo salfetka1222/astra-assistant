@@ -14,6 +14,39 @@ class AstraTaskEngineTest {
         assertEquals("device.status", AstraTaskEngine.fromUserText("проверь батарею")?.steps?.single()?.actionId)
     }
 
+    @Test fun recognizesNativeAppLaunchesAndReadOnlyCapabilities() {
+        val examples = mapOf(
+            "ОТКРОЙ КАМЕРУ" to "apps.camera.open",
+            "запусти камеру" to "apps.camera.open",
+            "открой будильник" to "apps.alarms.open",
+            "открой телефон" to "apps.dialer.open",
+            "что ты умеешь на телефоне" to "device.capabilities"
+        )
+        examples.forEach { (phrase, id) ->
+            assertEquals(id, AstraTaskEngine.fromUserText(phrase)?.steps?.single()?.actionId)
+        }
+        assertEquals(ActionBackend.APP_LAUNCH, AstraActionRegistry.find("apps.camera.open")?.backend)
+        assertEquals(AstraPermissionDecision.Allowed,
+            AstraPermissionGuard.check("device.capabilities", confirmed = false))
+    }
+
+    @Test fun appLaunchesRequireConfirmationAndRejectCompositeCommands() {
+        listOf("apps.camera.open", "apps.alarms.open", "apps.dialer.open").forEach { id ->
+            assertEquals(AstraPermissionDecision.ConfirmationRequired,
+                AstraPermissionGuard.check(id, confirmed = false))
+            assertEquals(AstraPermissionDecision.Allowed,
+                AstraPermissionGuard.check(id, confirmed = true))
+        }
+        listOf(
+            "открой камеру и сделай фото",
+            "открой телефон и позвони",
+            "открой камеру; отправь файл",
+            "открой телефон\nпозвони маме",
+            "включи будильник на 7 утра",
+            "позвони 112"
+        ).forEach { assertNull("Unexpected command accepted: $it", AstraTaskEngine.fromUserText(it)) }
+    }
+
     @Test fun recognizesOnlyReviewedAccessibilityCommands() {
         val examples = mapOf(
             "назад" to "navigation.back",
