@@ -6,6 +6,7 @@ import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
+import com.astra.assistant.core.OneShotResult
 import java.lang.ref.WeakReference
 
 /**
@@ -86,15 +87,24 @@ class AstraAccessibilityService : AccessibilityService() {
 
         /** Requires a direct user interaction; also used by the existing manual control panel. */
         fun performManualAction(action: String, callback: (Boolean) -> Unit) {
-            Handler(Looper.getMainLooper()).post {
+            val handler = Handler(Looper.getMainLooper())
+            val once = OneShotResult(callback)
+            // Accessibility may disconnect mid-gesture. Never leave the chat waiting forever.
+            val timeout = Runnable { once.deliver(false) }
+            val finish: (Boolean) -> Unit = { accepted ->
+                handler.removeCallbacks(timeout)
+                once.deliver(accepted)
+            }
+            handler.postDelayed(timeout, 6_000L)
+            handler.post {
                 val service = activeService?.get()
                 if (service == null) {
-                    callback(false)
+                    finish(false)
                 } else {
                     try {
-                        service.execute(action, callback)
+                        service.execute(action, finish)
                     } catch (_: Exception) {
-                        callback(false)
+                        finish(false)
                     }
                 }
             }
