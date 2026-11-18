@@ -4,7 +4,7 @@ import java.util.Locale
 
 /** A closed allowlist: natural language can select actions, never create new permissions. */
 enum class ActionRisk { READ_ONLY, NAVIGATION, SENSITIVE }
-enum class ActionBackend { DEVICE_STATUS, DEVICE_CAPABILITIES, DEVICE_MAP, SETTINGS, APP_LAUNCH, ACCESSIBILITY }
+enum class ActionBackend { DEVICE_STATUS, DEVICE_CAPABILITIES, DEVICE_MAP, SETTINGS, APP_LAUNCH, CATALOG_LAUNCH, ACCESSIBILITY }
 
 data class AstraAction(
     val id: String,
@@ -19,6 +19,7 @@ object AstraActionRegistry {
         AstraAction("device.status", "состояние телефона", ActionRisk.READ_ONLY, false, ActionBackend.DEVICE_STATUS),
         AstraAction("device.capabilities", "возможности Astra", ActionRisk.READ_ONLY, false, ActionBackend.DEVICE_CAPABILITIES),
         AstraAction("device.map", "карту устройства", ActionRisk.READ_ONLY, false, ActionBackend.DEVICE_MAP),
+        AstraAction("apps.catalog.open", "приложение из каталога", ActionRisk.NAVIGATION, true, ActionBackend.CATALOG_LAUNCH),
         AstraAction("apps.camera.open", "камеру", ActionRisk.NAVIGATION, true, ActionBackend.APP_LAUNCH),
         AstraAction("apps.alarms.open", "будильники", ActionRisk.NAVIGATION, true, ActionBackend.APP_LAUNCH),
         AstraAction("apps.dialer.open", "набор номера", ActionRisk.NAVIGATION, true, ActionBackend.APP_LAUNCH),
@@ -40,7 +41,11 @@ object AstraActionRegistry {
     fun available(): List<AstraAction> = actions.values.toList()
 }
 
-data class AstraTaskStep(val actionId: String)
+data class AstraTaskStep(val actionId: String, val target: AppCatalogEntry? = null) {
+    val title: String
+        get() = target?.let { "«${it.label}» (${it.packageName})" }
+            ?: AstraActionRegistry.find(actionId)?.title ?: "действие"
+}
 data class AstraTaskPlan(val steps: List<AstraTaskStep>)
 
 sealed class AstraPermissionDecision {

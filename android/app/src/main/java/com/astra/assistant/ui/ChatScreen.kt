@@ -75,6 +75,7 @@ import com.astra.assistant.core.AstraActionRegistry
 import com.astra.assistant.core.AstraNativeActionExecutor
 import com.astra.assistant.core.DeviceAppCatalog
 import com.astra.assistant.core.AppCatalog
+import com.astra.assistant.core.ChatCommand
 import com.astra.assistant.core.AppCatalogSnapshot
 import com.astra.assistant.data.MessageEntity
 
@@ -211,7 +212,7 @@ fun ChatScreen(
     pendingNativeAction?.let { request ->
         val plan = request.plan
         val action = plan.steps.singleOrNull()?.let { AstraActionRegistry.find(it.actionId) }
-        val title = action?.title ?: "действие"
+        val title = plan.steps.single().title
         val usesAccessibility = action?.backend == ActionBackend.ACCESSIBILITY
         fun cancel() {
             if (!request.consume()) return
@@ -341,10 +342,11 @@ fun ChatScreen(
                             val text = draft
                             val normalized = text.trim().lowercase().replace(Regex("\\s+"), " ")
                             if (pendingNativeAction != null) return@Button
-                            pendingNativeAction = AstraTaskEngine.fromUserText(text)?.takeIf { plan ->
+                            val command = ChatCommand.resolve(text, appCatalog)
+                            pendingNativeAction = (command as? ChatCommand.Planned)?.plan?.takeIf { plan ->
                                 plan.steps.any { AstraActionRegistry.find(it.actionId)?.requiresConfirmation == true }
                             }?.let(::AstraConfirmationToken)
-                            viewModel.send(text)
+                            viewModel.send(text, command)
                             draft = ""
                             if (normalized in setOf("диагностика подключения", "termux не работает")) {
                                 showBridge = true
@@ -395,7 +397,7 @@ fun ChatScreen(
                     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) {
                         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("Каталог приложений", style = MaterialTheme.typography.titleLarge)
-                            Text("По твоему разрешению Astra запомнит названия запускаемых приложений. Не читает их внутренние данные и не отправляет каталог в сеть.",
+                            Text("Нажми «Изучить приложения», затем напиши в чате, например, «открой Telegram». Каталог хранится на телефоне.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                             appCatalogMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }

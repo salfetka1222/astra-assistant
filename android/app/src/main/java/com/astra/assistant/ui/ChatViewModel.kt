@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.astra.assistant.core.AssistantEngine
-import com.astra.assistant.core.AstraTaskEngine
+import com.astra.assistant.core.ChatCommand
 import com.astra.assistant.core.AstraNativeActionExecutor
 import com.astra.assistant.core.ActionRisk
 import com.astra.assistant.core.AstraActionRegistry
@@ -37,18 +37,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptyList()
     )
 
-    fun send(text: String) {
+    fun send(text: String, command: ChatCommand?) {
         val cleanText = text.trim()
         if (cleanText.isEmpty()) return
-        // Inspect raw input before trim: embedded or trailing newlines must not become actions.
-        val nativePlan = AstraTaskEngine.fromUserText(text)
 
         // Set before launching the coroutine: the indicator appears immediately on Send.
         _pendingReplies.update { it + 1 }
         viewModelScope.launch {
             try {
                 dao.insert(MessageEntity(role = "user", content = cleanText))
-                val response = if (nativePlan != null) {
+                val response = if (command is ChatCommand.Feedback) {
+                    command.message
+                } else if (command is ChatCommand.Planned) {
+                    val nativePlan = command.plan
                     val action = nativePlan.steps.singleOrNull()
                         ?.let { AstraActionRegistry.find(it.actionId) }
                     if (action?.risk == ActionRisk.READ_ONLY) {
@@ -56,7 +57,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             AstraNativeActionExecutor.execute(getApplication<Application>(), nativePlan, confirmed = false).message
                         }
                     } else {
-                        "Команда распознана: ${action?.title ?: "действие"}. Подтверди или отмени её в диалоге."
+                        "Команда распознана: ${nativePlan.steps.single().title}. Подтверди или отмени её в диалоге."
                     }
                 } else when (cleanText.trim().lowercase().replace(Regex("\\s+"), " ")) {
                     "покажи файлы", "список файлов", "файлы termux", "что в workspace" -> bridgeRequest("list_files")

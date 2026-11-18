@@ -36,6 +36,7 @@ object AstraNativeActionExecutor {
             ActionBackend.DEVICE_CAPABILITIES -> readNativeCapabilities()
             ActionBackend.DEVICE_MAP -> AstraExecutionResult(true, DeviceIntelligence.report(context))
             ActionBackend.SETTINGS -> openSettings(context, action)
+            ActionBackend.CATALOG_LAUNCH -> openCatalogApp(context, step.target)
             ActionBackend.APP_LAUNCH -> openSystemApp(context, action)
             ActionBackend.ACCESSIBILITY ->
                 AstraExecutionResult(false, "Для этой команды требуется исполнитель Accessibility.")
@@ -103,9 +104,30 @@ object AstraNativeActionExecutor {
             "Нативные возможности Astra\n" +
                 "Зарегистрировано команд: $count\n" +
                 "Accessibility: $accessibility\n" +
-                "Без Termux: диагностика телефона, открытие системных приложений и настроек.\n" +
+                "Без Termux: диагностика телефона, открытие настроек и приложений по названию из локального каталога.\n" +
                 "Для навигации требуется подтверждение. Для ответов ChatGPT пока нужен Termux Bridge."
         )
+    }
+
+    private fun openCatalogApp(context: Context, target: AppCatalogEntry?): AstraExecutionResult {
+        if (target == null || DeviceAppCatalog.load(context)?.apps?.contains(target) != true) {
+            return AstraExecutionResult(false, "Приложение отсутствует в сохранённом каталоге. Обнови каталог и повтори команду.")
+        }
+        return try {
+            val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                .setPackage(target.packageName)
+            val activity = context.packageManager.queryIntentActivities(intent, 0)
+                .mapNotNull { it.activityInfo }
+                .firstOrNull { it.exported && it.packageName == target.packageName }
+                ?: return AstraExecutionResult(false, "Приложение больше недоступно для запуска. Обнови каталог.")
+            intent.setClassName(activity.packageName, activity.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            AstraExecutionResult(true, "Запрос на открытие «${target.label}» передан Android.")
+        } catch (_: ActivityNotFoundException) {
+            AstraExecutionResult(false, "Android больше не находит это приложение. Обнови каталог.")
+        } catch (_: SecurityException) {
+            AstraExecutionResult(false, "Android запретил запуск этого приложения.")
+        }
     }
 
     /** Opens a system application; never dials a number or accesses its private data. */
