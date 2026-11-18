@@ -26,6 +26,11 @@ Astra should develop a useful map of the device, discover where permitted action
 6. **2.2 — Adaptive local memory.** Store user-edited aliases (e.g. "музыка" -> chosen app), preferred settings screens, task successes, and failure patterns; support view, edit, export and erase.
 7. **2.3 — Supervised multi-step autonomy.** Understand -> plan -> show permissions -> confirm -> act -> verify; stop on ambiguities and risky boundaries, with recovery where reversible.
 
+## Preview validation
+
+- 2.0.0-alpha.8 (35): owner confirmed catalog launch on the iQOO Neo 10.
+- 2.0.0-alpha.9 (36): manual 24-hour usage summary for saved launcher entries. Counts foreground transitions, merges consecutive activities for the same package, and shows the latest activity time. Results live only in memory while the Tools screen is active. Device validation pending.
+
 ## Scope note
 
 The initial catalog stores **only** names/identifiers of app launchers. A full application list or its contents is neither promised nor needed to fulfill early discovery and quick-launch workflows. The user decides when to expand categories.

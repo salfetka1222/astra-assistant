@@ -433,6 +433,7 @@ fun ChatScreen(
                             }
                         }
                     }
+                    androidx.compose.runtime.key(appCatalog) { AppUsageCard(appCatalog) }
                     Card(onClick = { showBridge = true }, modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(24.dp)) {
                         Column(modifier = Modifier.padding(20.dp)) {
