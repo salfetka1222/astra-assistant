@@ -1,0 +1,16 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Queue one destination for review in Astra Preview. No shell or free-form Intent input.
+set -eu
+usage() { echo "Usage: astra-voice {wifi|display|sound|settings|camera|alarms}"; }
+if [[ $# != 1 ]]; then usage >&2; exit 2; fi
+case "$1" in
+    --help|-h) usage; exit 0 ;;
+    wifi|display|sound|settings|camera|alarms) ;;
+    *) usage >&2; exit 2 ;;
+esac
+package=com.astra.assistant.preview
+am broadcast --receiver-foreground -a com.astra.assistant.PROPOSE_VOICE \
+    -n "$package/com.astra.assistant.VoiceProposalReceiver" --es shortcut "$1"
+am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
+    -n "$package/com.astra.assistant.MainActivity" || true
+echo 'Запрос передан Android. Если Astra Preview не появилась, открой её вручную в течение двух минут. Результат действия подтверждается на телефоне.'

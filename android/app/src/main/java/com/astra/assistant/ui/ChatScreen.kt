@@ -276,6 +276,7 @@ fun ChatScreen(
                     Icon(Icons.Filled.Settings, contentDescription = "Настройки")
                 }
             }
+            VoiceProposalPanel(showSettings = selectedTab == 2, onResult = viewModel::reportNativeAction)
             when (selectedTab) {
                 0 -> {
                     Column(
@@ -338,6 +339,14 @@ fun ChatScreen(
                         OutlinedTextField(value = draft, onValueChange = { draft = it },
                             modifier = Modifier.weight(1f), placeholder = { Text("Сообщение Astra…") },
                             shape = RoundedCornerShape(24.dp), maxLines = 4)
+                        VoiceInputButton(
+                            onPhrase = { phrase ->
+                                val updated = com.astra.assistant.core.VoiceDraft.append(draft, phrase, appCatalog)
+                                if (updated != null) draft = updated
+                                else android.widget.Toast.makeText(context, "Фраза не помещается в сообщение.", android.widget.Toast.LENGTH_SHORT).show()
+                            },
+                            onMessage = { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
+                        )
                         Button(onClick = {
                             val text = draft
                             val normalized = text.trim().lowercase().replace(Regex("\\s+"), " ")

@@ -21,6 +21,9 @@
         android:roundIcon="@drawable/astra_icon"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <receiver
+            android:name=".VoiceProposalReceiver"
+            android:exported="true" />
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.updates"
